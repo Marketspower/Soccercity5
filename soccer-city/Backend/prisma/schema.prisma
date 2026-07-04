@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  email         String    @unique
+  phone         String?
+  role          String    @default("client")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  
+  reservations  Reservation[]
+  notifications Notification[] @relation("NotificationSender")
+
+  @@map("users")
+}
+
+model Field {
+  id              String       @id @default(cuid())
+  name            String
+  slug            String       @unique
+  imageUrl        String?      @map("image_url")
+  dimensions      String
+  turf            String
+  lighting        Boolean      @default(true)
+  lockerRooms     Int          @default(2) @map("locker_rooms")
+  parking         Boolean      @default(true)
+  players         String
+  pricePerHour    Float        @map("price_per_hour")
+  indoor          Boolean      @default(false)
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  
+  reservations    Reservation[]
+  availability    Availability[]
+  reviews         Review[]
+
+  @@map("fields")
+}
+
+model Reservation {
+  id            String   @id @default(cuid())
+  fieldId       String   @map("field_id")
+  userId        String?  @map("user_id")
+  userName      String   @map("user_name")
+  userEmail     String   @map("user_email")
+  userPhone     String   @map("user_phone")
+  date          String   // Format "YYYY-MM-DD"
+  hour          Int
+  price         Float
+  status        String   @default("confirmed")
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  field         Field    @relation(fields: [fieldId], references: [id])
+  user          User?    @relation(fields: [userId], references: [id])
+
+  @@unique([fieldId, date, hour])
+  @@map("reservations")
+}
+
+model PrivateEvent {
+  id          String   @id @default(cuid())
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  company     String?
+  phone       String
+  email       String
+  date        String
+  guests      Int
+  type        String
+  message     String
+  status      String   @default("new")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("private_events")
+}
+
+model Availability {
+  id          String   @id @default(cuid())
+  fieldId     String   @map("field_id")
+  date        String
+  hour        Int
+  blocked     Boolean  @default(true)
+  reason      String?
+  
+  field       Field    @relation(fields: [fieldId], references: [id])
+
+  @@unique([fieldId, date, hour])
+  @@map("availability")
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  author      String
+  role        String?
+  rating      Int
+  text        String
+  approved    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  field       Field?   @relation(fields: [fieldId], references: [id])
+  fieldId     String?  @map("field_id")
+
+  @@map("reviews")
+}
+
+model Gallery {
+  id          String   @id @default(cuid())
+  imageUrl    String   @map("image_url")
+  alt         String
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("gallery")
+}
+
+model Setting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  @@map("settings")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  audience    String   @default("all")
+  sentById    String?  @map("sent_by")
+  sentAt      DateTime @default(now()) @map("sent_at")
+  
+  sentBy      User?    @relation("NotificationSender", fields: [sentById], references: [id])
+
+  @@map("notifications")
+}
