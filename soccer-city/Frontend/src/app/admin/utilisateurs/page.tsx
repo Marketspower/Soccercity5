@@ -34,9 +34,7 @@ export default function AdminUsers() {
         });
       }
     }
-    
-    // Correction ici : convertir en tableau avant de trier
-    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+    return [...map.values()].sort((a, b) => b.total - a.total);
   }, [reservations]);
 
   return (
