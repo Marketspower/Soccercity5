@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { PRICING } from "@/lib/data";
 import { formatCAD, cn } from "@/lib/utils";
+import type { PricingPlan } from "@/lib/types";
 
 export function Pricing() {
   return (
@@ -18,7 +19,7 @@ export function Pricing() {
       </Reveal>
 
       <Stagger className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        {PRICING.map((plan) => (
+        {PRICING.map((plan: PricingPlan) => (
           <StaggerItem key={plan.id} className="h-full">
             <article
               className={cn(
@@ -37,9 +38,9 @@ export function Pricing() {
                 <span className="ml-1 text-sm font-medium not-italic text-muted-foreground">{plan.unit}</span>
               </p>
               <ul className="mt-6 flex-1 space-y-3">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-muted-foreground">
-                    <Check className="mt-0.5 size-4 shrink-0 text-pitch" /> {f}
+                {plan.features.map((feature: string) => (
+                  <li key={feature} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                    <Check className="mt-0.5 size-4 shrink-0 text-pitch" /> {feature}
                   </li>
                 ))}
               </ul>
@@ -53,5 +54,7 @@ export function Pricing() {
         ))}
       </Stagger>
     </section>
+  );
+}
   );
 }
