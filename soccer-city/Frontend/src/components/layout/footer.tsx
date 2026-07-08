@@ -20,6 +20,7 @@ const NAV = [
   { title: "Légal", links: [
     { href: "/mentions-legales", label: "Mentions légales" },
     { href: "/confidentialite", label: "Politique de confidentialité" },
+    { href: "/conditions", label: "Conditions d'utilisation" },
     { href: "/admin", label: "Administration" },
   ]},
 ];

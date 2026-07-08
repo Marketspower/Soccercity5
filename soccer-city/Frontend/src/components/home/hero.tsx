@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRef, useEffect } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { CalendarCheck, PartyPopper, ChevronDown, Zap, Clock } from "lucide-react";
+import { CalendarCheck, PartyPopper, ChevronDown, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter } from "@/components/motion/counter";
 import { useAppStore } from "@/lib/store";
@@ -15,13 +15,26 @@ export function Hero() {
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "24%"]);
   const fade = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
   
-  const { fields, reservations } = useAppStore();
+  const { fields, stats, loadStats } = useAppStore();
   const activeFields = fields.filter(f => f.active).length;
-  const todayReservations = reservations.filter(r => r.status === "confirmed").length;
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  // Récupérer les valeurs des statistiques
+  const getStatValue = (key: string) => {
+    const stat = stats.find(s => s.key === key);
+    return stat ? stat.value : 0;
+  };
+
+  const getStatSuffix = (key: string) => {
+    const stat = stats.find(s => s.key === key);
+    return stat ? stat.suffix : '';
+  };
 
   return (
     <section ref={ref} className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#050607]">
-      {/* Arrière-plan immersif */}
       <motion.div style={{ y: bgY }} className="absolute inset-0 gpu" aria-hidden>
         <video
           className="absolute inset-0 h-full w-full object-cover opacity-40"
@@ -56,7 +69,6 @@ export function Hero() {
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
       </motion.div>
 
-      {/* Contenu */}
       <motion.div style={{ opacity: fade }} className="container relative z-10 flex flex-1 flex-col justify-center pt-28 pb-16">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
@@ -109,7 +121,6 @@ export function Hero() {
           className="mt-6 max-w-xl text-base text-white/70 sm:text-lg"
         >
           {activeFields} terrains d&apos;exception, éclairage LED, réservation instantanée.
-          {todayReservations > 0 && ` Déjà ${todayReservations} matchs aujourd'hui.`}
         </motion.p>
 
         <motion.div
@@ -143,28 +154,28 @@ export function Hero() {
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Terrains</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={activeFields} />
+              <Counter value={getStatValue('terrains')} />
             </dd>
             <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">Terrains</p>
           </div>
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Matchs</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={12500} suffix="+" />
+              <Counter value={getStatValue('matchs_joues')} suffix={getStatSuffix('matchs_joues')} />
             </dd>
             <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">Matchs joués</p>
           </div>
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Satisfaction</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={98} suffix="%" />
+              <Counter value={getStatValue('satisfaction')} suffix={getStatSuffix('satisfaction')} />
             </dd>
             <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">Satisfaction</p>
           </div>
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Expérience</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={8} suffix="+" />
+              <Counter value={getStatValue('annees_experience')} suffix={getStatSuffix('annees_experience')} />
             </dd>
             <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">Années</p>
           </div>
@@ -185,7 +196,6 @@ export function Hero() {
         </motion.div>
       </motion.div>
 
-      {/* Indicateur de scroll */}
       <motion.div
         className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-white/40"
         animate={{ y: [0, 8, 0] }}

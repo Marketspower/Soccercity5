@@ -162,8 +162,51 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 );
 
 -- ============================================
+-- 11. TABLE STATS (Statistiques)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.stats (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    key TEXT UNIQUE NOT NULL,
+    value INTEGER NOT NULL DEFAULT 0,
+    label TEXT NOT NULL,
+    suffix TEXT DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================
+-- 12. TABLE RATINGS (Évaluations des clients)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.ratings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================
+-- 13. TABLE PAGES (CMS)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.pages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================
 -- INSERTION DES DONNÉES INITIALES
 -- ============================================
+
+-- Insertion des statistiques initiales
+INSERT INTO public.stats (key, value, label, suffix) VALUES
+('matchs_joues', 12500, 'Matchs joués', '+'),
+('satisfaction', 98, 'Satisfaction', '%'),
+('annees_experience', 8, 'Années d''expérience', '+'),
+('terrains', 4, 'Terrains', '')
+ON CONFLICT (key) DO NOTHING;
 
 -- Insertion des terrains
 INSERT INTO public.fields (name, slug, image_url, dimensions, turf, lighting, locker_rooms, parking, players, price_per_hour, indoor, active) VALUES
@@ -185,6 +228,65 @@ INSERT INTO public.settings (key, value) VALUES
 ('close_hour', '23'),
 ('contact', '{"phone":"+1 (450) 555-0192","email":"info@soccercity.ca"}');
 
+-- Insertion des pages initiales
+INSERT INTO public.pages (slug, title, content) VALUES
+('confidentialite', 'Politique de confidentialité', '<h2>Données collectées</h2><p>Lors d''une réservation ou d''une demande d''événement, nous collectons uniquement les informations nécessaires : nom, prénom, courriel, numéro de téléphone.</p><h2>Finalités</h2><p>Ces données servent exclusivement à gérer votre réservation.</p>'),
+('conditions', 'Conditions d''utilisation', '<h2>Acceptation des conditions</h2><p>En utilisant ce site, vous acceptez les présentes conditions.</p><h2>Responsabilité</h2><p>Soccer City ne saurait être tenu responsable des erreurs ou omissions.</p>')
+ON CONFLICT (slug) DO NOTHING;
+
+-- ============================================
+-- FONCTIONS ET TRIGGERS
+-- ============================================
+
+-- Fonction pour mettre à jour la satisfaction automatiquement
+CREATE OR REPLACE FUNCTION update_satisfaction()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE public.stats 
+    SET value = (
+        SELECT ROUND(AVG(rating) * 10) / 10
+        FROM public.ratings
+        WHERE rating IS NOT NULL
+    )
+    WHERE key = 'satisfaction';
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger sur les évaluations
+CREATE TRIGGER update_satisfaction_trigger
+AFTER INSERT OR UPDATE OR DELETE ON public.ratings
+EXECUTE FUNCTION update_satisfaction();
+
+-- Fonction pour incrémenter les matchs joués
+CREATE OR REPLACE FUNCTION increment_matchs_joues()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE public.stats 
+    SET value = value + 1 
+    WHERE key = 'matchs_joues';
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger sur les réservations confirmées
+CREATE TRIGGER increment_matchs_trigger
+AFTER INSERT ON public.reservations
+FOR EACH ROW
+WHEN (NEW.status = 'confirmed')
+EXECUTE FUNCTION increment_matchs_joues();
+
+-- Fonction admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.users 
+        WHERE id = auth.uid() AND role = 'admin'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ============================================
 -- POLITIQUES RLS (Row Level Security)
 -- ============================================
@@ -199,6 +301,9 @@ ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.gallery ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ratings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pages ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- POLITIQUES DE LECTURE PUBLIQUE
@@ -222,6 +327,15 @@ CREATE POLICY "Lecture publique des paramètres" ON public.settings
 CREATE POLICY "Lecture publique des disponibilités" ON public.availability
     FOR SELECT USING (true);
 
+CREATE POLICY "Lecture publique des statistiques" ON public.stats
+    FOR SELECT USING (true);
+
+CREATE POLICY "Lecture publique des évaluations" ON public.ratings
+    FOR SELECT USING (true);
+
+CREATE POLICY "Lecture publique des pages" ON public.pages
+    FOR SELECT USING (true);
+
 -- ============================================
 -- POLITIQUES DE CRÉATION PUBLIQUE
 -- ============================================
@@ -235,19 +349,27 @@ CREATE POLICY "Création publique des événements" ON public.private_events
 CREATE POLICY "Création publique des avis" ON public.reviews
     FOR INSERT WITH CHECK (true);
 
+CREATE POLICY "Création publique des évaluations" ON public.ratings
+    FOR INSERT WITH CHECK (true);
+
 -- ============================================
--- FONCTION ADMIN
+-- POLITIQUES ADMIN
 -- ============================================
 
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM public.users 
-        WHERE id = auth.uid() AND role = 'admin'
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE POLICY "Admin gestion des terrains" ON public.fields
+    FOR ALL USING (public.is_admin());
+
+CREATE POLICY "Admin gestion des tarifs" ON public.pricing
+    FOR ALL USING (public.is_admin());
+
+CREATE POLICY "Admin gestion des statistiques" ON public.stats
+    FOR UPDATE USING (public.is_admin());
+
+CREATE POLICY "Admin gestion des utilisateurs" ON public.users
+    FOR ALL USING (public.is_admin() OR id = auth.uid());
+
+CREATE POLICY "Admin gestion des pages" ON public.pages
+    FOR ALL USING (public.is_admin());
 
 -- ============================================
 -- STORAGE - Buckets et politiques
@@ -264,6 +386,18 @@ CREATE POLICY "Lecture publique des images" ON storage.objects
 
 CREATE POLICY "Upload authentifié des images" ON storage.objects
     FOR INSERT WITH CHECK (
+        bucket_id = 'images' 
+        AND auth.role() = 'authenticated'
+    );
+
+CREATE POLICY "Modification authentifiée des images" ON storage.objects
+    FOR UPDATE USING (
+        bucket_id = 'images' 
+        AND auth.role() = 'authenticated'
+    );
+
+CREATE POLICY "Suppression authentifiée des images" ON storage.objects
+    FOR DELETE USING (
         bucket_id = 'images' 
         AND auth.role() = 'authenticated'
     );

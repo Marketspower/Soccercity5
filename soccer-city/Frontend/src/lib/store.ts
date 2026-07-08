@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { supabase } from "./supabase";
+import { supabase, getCurrentUser, isUserAdmin } from "./supabase";
 import type { 
   Field, 
   Reservation, 
@@ -11,10 +11,30 @@ import type {
   AppNotification, 
   ReservationStatus, 
   EventStatus,
-  PricingPlan
+  PricingPlan,
+  Stat,
+  Rating
 } from "./types";
-import { FIELDS, PRICING } from "./data";
-import { uid } from "./utils";
+
+// Données par défaut pour le pricing (si aucune donnée en base)
+const DEFAULT_PRICING: PricingPlan[] = [
+  {
+    id: "p1",
+    name: "À l'heure",
+    price: 90,
+    unit: "/ heure",
+    features: ["Bloc d'1 heure garanti", "Vestiaires + douches inclus", "Éclairage LED compris", "Annulation gratuite 24 h avant"],
+    highlighted: false,
+  },
+  {
+    id: "p2",
+    name: "Journée",
+    price: 650,
+    unit: "/ jour",
+    features: ["Terrain privatisé 8 h – 23 h", "Coordinateur sur place", "Sonorisation incluse", "10 ballons de match fournis"],
+    highlighted: true,
+  },
+];
 
 interface AppState {
   // État
@@ -24,13 +44,19 @@ interface AppState {
   blocked: BlockedSlot[];
   notifications: AppNotification[];
   pricing: PricingPlan[];
+  stats: Stat[];
+  ratings: Rating[];
   isLoading: boolean;
   isInitialized: boolean;
   uploading: boolean;
   error: string | null;
+  user: any | null;
+  isAdmin: boolean;
 
   // Initialisation
   loadInitialData: () => Promise<void>;
+  loadUser: () => Promise<void>;
+  setupRealtime: () => void;
 
   // Synchronisation
   syncFields: () => Promise<void>;
@@ -38,9 +64,17 @@ interface AppState {
   syncEvents: () => Promise<void>;
   syncBlocked: () => Promise<void>;
   syncPricing: () => Promise<void>;
+  syncStats: () => Promise<void>;
+  syncRatings: () => Promise<void>;
+
+  // Chargement
+  loadFields: () => Promise<void>;
+  loadStats: () => Promise<void>;
+  loadRatings: () => Promise<void>;
+  loadReservations: () => Promise<void>;
 
   // Terrains
-  addField: (f: Omit<Field, "id">) => Promise<Field>;
+  addField: (f: Omit<Field, "id" | "created_at">) => Promise<Field>;
   updateField: (id: string, patch: Partial<Field>) => Promise<Field>;
   removeField: (id: string) => Promise<void>;
 
@@ -48,11 +82,11 @@ interface AppState {
   uploadFieldImage: (file: File) => Promise<string>;
 
   // Réservations
-  addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status">) => Reservation;
+  addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status">) => Promise<Reservation>;
   setReservationStatus: (id: string, status: ReservationStatus) => Promise<void>;
 
   // Événements
-  addEvent: (e: Omit<PrivateEvent, "id" | "createdAt" | "status">) => PrivateEvent;
+  addEvent: (e: Omit<PrivateEvent, "id" | "createdAt" | "status">) => Promise<PrivateEvent>;
   setEventStatus: (id: string, status: EventStatus) => Promise<void>;
 
   // Disponibilités
@@ -61,58 +95,85 @@ interface AppState {
 
   // Notifications
   sendNotification: (n: Omit<AppNotification, "id" | "sentAt">) => Promise<AppNotification>;
-}
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  // Statistiques
+  updateStat: (key: string, value: number) => Promise<void>;
+
+  // Évaluations
+  addRating: (rating: number, comment?: string) => Promise<void>;
+
+  // Admin
+  checkAdminAccess: () => Promise<boolean>;
+
+  // Réinitialisation
+  resetStore: () => void;
+}
 
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      // --- État initial ---
-      fields: FIELDS,
+      // ============================================
+      // ÉTAT INITIAL
+      // ============================================
+      fields: [],
       reservations: [],
       events: [],
       blocked: [],
       notifications: [],
-      pricing: PRICING,
+      pricing: DEFAULT_PRICING,
+      stats: [],
+      ratings: [],
       isLoading: false,
       isInitialized: false,
       uploading: false,
       error: null,
+      user: null,
+      isAdmin: false,
 
-      // --- Initialisation ---
+      // ============================================
+      // CHARGEMENT DE L'UTILISATEUR
+      // ============================================
+      loadUser: async () => {
+        try {
+          const user = await getCurrentUser();
+          const admin = await isUserAdmin();
+          set({ user, isAdmin: admin });
+        } catch (error) {
+          console.error('❌ Erreur loadUser:', error);
+          set({ user: null, isAdmin: false });
+        }
+      },
+
+      // ============================================
+      // INITIALISATION
+      // ============================================
       loadInitialData: async () => {
         if (get().isInitialized) return;
         
         set({ isLoading: true, error: null });
         
         try {
-          const [fieldsRes, reservationsRes, eventsRes, blockedRes, pricingRes] = await Promise.all([
-            fetch(`${API_BASE}/fields`).then(r => r.json()).catch(() => []),
-            fetch(`${API_BASE}/reservations`).then(r => r.json()).catch(() => []),
-            fetch(`${API_BASE}/events`).then(r => r.json()).catch(() => []),
-            fetch(`${API_BASE}/admin/availability`).then(r => r.json()).catch(() => []),
-            fetch(`${API_BASE}/pricing`).then(r => r.json()).catch(() => [])
+          // Charger l'utilisateur
+          await get().loadUser();
+
+          // Charger toutes les données
+          await Promise.all([
+            get().loadFields(),
+            get().loadReservations(),
+            get().syncEvents(),
+            get().syncBlocked(),
+            get().syncPricing(),
+            get().loadStats(),
+            get().loadRatings()
           ]);
 
-          set({
-            fields: fieldsRes.length > 0 ? fieldsRes : FIELDS,
-            reservations: reservationsRes || [],
-            events: eventsRes || [],
-            blocked: blockedRes || [],
-            pricing: pricingRes.length > 0 ? pricingRes : PRICING,
-            isInitialized: true,
-            isLoading: false
-          });
+          // Configurer Realtime
+          get().setupRealtime();
 
-          await get().syncFields();
-          await get().syncReservations();
-          await get().syncEvents();
-          await get().syncBlocked();
-          await get().syncPricing();
-
+          set({ isInitialized: true, isLoading: false });
+          console.log('✅ Données initialisées avec succès');
         } catch (error) {
-          console.error('Erreur chargement initial:', error);
+          console.error('❌ Erreur chargement initial:', error);
           set({ 
             error: 'Erreur de connexion au serveur',
             isLoading: false,
@@ -121,37 +182,68 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      // --- Synchronisation ---
+      // ============================================
+      // CONFIGURATION REALTIME
+      // ============================================
+      setupRealtime: () => {
+        console.log('📡 Configuration des canaux Realtime...');
+
+        // Terrains
+        supabase
+          .channel('fields-changes')
+          .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'fields' }, 
+            () => {
+              console.log('🔄 Mise à jour des terrains');
+              get().loadFields();
+            })
+          .subscribe();
+
+        // Réservations
+        supabase
+          .channel('reservations-changes')
+          .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'reservations' }, 
+            () => {
+              console.log('🔄 Mise à jour des réservations');
+              get().loadReservations();
+            })
+          .subscribe();
+
+        // Statistiques
+        supabase
+          .channel('stats-changes')
+          .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'stats' }, 
+            () => {
+              console.log('🔄 Mise à jour des statistiques');
+              get().loadStats();
+            })
+          .subscribe();
+
+        // Évaluations
+        supabase
+          .channel('ratings-changes')
+          .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'ratings' }, 
+            () => {
+              console.log('🔄 Mise à jour des évaluations');
+              get().loadRatings();
+            })
+          .subscribe();
+
+        console.log('✅ Canaux Realtime configurés');
+      },
+
+      // ============================================
+      // SYNCHRONISATION
+      // ============================================
       syncFields: async () => {
-        try {
-          const { data, error } = await supabase
-            .from('fields')
-            .select('*')
-            .order('created_at', { ascending: true });
-          
-          if (error) throw error;
-          if (data && data.length > 0) {
-            set({ fields: data });
-          }
-        } catch (error) {
-          console.error('Erreur syncFields:', error);
-        }
+        await get().loadFields();
       },
 
       syncReservations: async () => {
-        try {
-          const { data, error } = await supabase
-            .from('reservations')
-            .select('*')
-            .order('created_at', { ascending: false });
-          
-          if (error) throw error;
-          if (data) {
-            set({ reservations: data });
-          }
-        } catch (error) {
-          console.error('Erreur syncReservations:', error);
-        }
+        await get().loadReservations();
       },
 
       syncEvents: async () => {
@@ -162,11 +254,9 @@ export const useAppStore = create<AppState>()(
             .order('created_at', { ascending: false });
           
           if (error) throw error;
-          if (data) {
-            set({ events: data });
-          }
+          set({ events: data || [] });
         } catch (error) {
-          console.error('Erreur syncEvents:', error);
+          console.error('❌ Erreur syncEvents:', error);
         }
       },
 
@@ -178,11 +268,9 @@ export const useAppStore = create<AppState>()(
             .order('date', { ascending: true });
           
           if (error) throw error;
-          if (data) {
-            set({ blocked: data });
-          }
+          set({ blocked: data || [] });
         } catch (error) {
-          console.error('Erreur syncBlocked:', error);
+          console.error('❌ Erreur syncBlocked:', error);
         }
       },
 
@@ -198,31 +286,95 @@ export const useAppStore = create<AppState>()(
             set({ pricing: data });
           }
         } catch (error) {
-          console.error('Erreur syncPricing:', error);
+          console.error('❌ Erreur syncPricing:', error);
         }
       },
 
-      // --- Upload d'images ---
+      syncStats: async () => {
+        await get().loadStats();
+      },
+
+      syncRatings: async () => {
+        await get().loadRatings();
+      },
+
+      // ============================================
+      // CHARGEMENT
+      // ============================================
+      loadFields: async () => {
+        try {
+          const { data, error } = await supabase
+            .from('fields')
+            .select('*')
+            .order('created_at', { ascending: true });
+          
+          if (error) throw error;
+          set({ fields: data || [] });
+        } catch (error) {
+          console.error('❌ Erreur loadFields:', error);
+        }
+      },
+
+      loadStats: async () => {
+        try {
+          const { data, error } = await supabase
+            .from('stats')
+            .select('*');
+          
+          if (error) throw error;
+          set({ stats: data || [] });
+        } catch (error) {
+          console.error('❌ Erreur loadStats:', error);
+        }
+      },
+
+      loadRatings: async () => {
+        try {
+          const { data, error } = await supabase
+            .from('ratings')
+            .select('*')
+            .order('created_at', { ascending: false });
+          
+          if (error) throw error;
+          set({ ratings: data || [] });
+        } catch (error) {
+          console.error('❌ Erreur loadRatings:', error);
+        }
+      },
+
+      loadReservations: async () => {
+        try {
+          const { data, error } = await supabase
+            .from('reservations')
+            .select('*')
+            .order('created_at', { ascending: false });
+          
+          if (error) throw error;
+          set({ reservations: data || [] });
+        } catch (error) {
+          console.error('❌ Erreur loadReservations:', error);
+        }
+      },
+
+      // ============================================
+      // UPLOAD D'IMAGES
+      // ============================================
       uploadFieldImage: async (file: File) => {
         set({ uploading: true });
         try {
-          // Valider le type
           const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
           if (!allowedTypes.includes(file.type)) {
             throw new Error('Format non supporté. Utilisez JPG, PNG, WEBP ou SVG.');
           }
 
-          // Valider la taille (5MB max)
           if (file.size > 5 * 1024 * 1024) {
             throw new Error('Fichier trop volumineux (max 5MB)');
           }
 
-          // Générer un nom unique
           const fileExt = file.name.split('.').pop();
           const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${fileExt}`;
           const filePath = `fields/${fileName}`;
 
-          // Upload vers Supabase Storage
           const { data, error } = await supabase.storage
             .from('images')
             .upload(filePath, file, {
@@ -232,7 +384,6 @@ export const useAppStore = create<AppState>()(
 
           if (error) throw error;
 
-          // Récupérer l'URL publique
           const { data: publicUrl } = supabase.storage
             .from('images')
             .getPublicUrl(filePath);
@@ -240,207 +391,368 @@ export const useAppStore = create<AppState>()(
           set({ uploading: false });
           return publicUrl.publicUrl;
         } catch (error) {
-          console.error('Erreur upload:', error);
+          console.error('❌ Erreur upload:', error);
           set({ uploading: false });
           throw error;
         }
       },
 
-      // --- Terrains ---
+      // ============================================
+      // TERRAINS
+      // ============================================
       addField: async (f) => {
         try {
-          const res = await fetch(`${API_BASE}/fields`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(f)
-          });
+          const { data, error } = await supabase
+            .from('fields')
+            .insert([{
+              name: f.name,
+              slug: f.name.toLowerCase().replace(/\s+/g, '-'),
+              image_url: f.image || '/fields/default.svg',
+              dimensions: f.dimensions,
+              turf: f.turf,
+              lighting: f.lighting,
+              locker_rooms: f.lockerRooms,
+              parking: f.parking,
+              players: f.players,
+              price_per_hour: f.pricePerHour,
+              indoor: f.indoor,
+              active: f.active !== undefined ? f.active : true
+            }])
+            .select()
+            .single();
+
+          if (error) throw error;
           
-          if (!res.ok) throw new Error('Erreur lors de la création du terrain');
+          await get().loadFields();
           
-          const field = await res.json();
-          set((state) => ({ fields: [...state.fields, field] }));
-          await get().syncFields();
-          return field;
+          // Mettre à jour le nombre de terrains
+          const fieldCount = get().fields.length;
+          await get().updateStat('terrains', fieldCount);
+          
+          console.log('✅ Terrain ajouté:', data);
+          return data as Field;
         } catch (error) {
-          console.error('Erreur addField:', error);
+          console.error('❌ Erreur addField:', error);
           throw error;
         }
       },
 
       updateField: async (id, patch) => {
         try {
-          const res = await fetch(`${API_BASE}/fields/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(patch)
-          });
+          const { data, error } = await supabase
+            .from('fields')
+            .update({
+              name: patch.name,
+              image_url: patch.image,
+              dimensions: patch.dimensions,
+              turf: patch.turf,
+              lighting: patch.lighting,
+              locker_rooms: patch.lockerRooms,
+              parking: patch.parking,
+              players: patch.players,
+              price_per_hour: patch.pricePerHour,
+              indoor: patch.indoor,
+              active: patch.active
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+          if (error) throw error;
           
-          if (!res.ok) throw new Error('Erreur lors de la mise à jour');
-          
-          const field = await res.json();
-          set((state) => ({
-            fields: state.fields.map((f) => (f.id === id ? field : f))
-          }));
-          await get().syncFields();
-          return field;
+          await get().loadFields();
+          console.log('✅ Terrain mis à jour:', data);
+          return data as Field;
         } catch (error) {
-          console.error('Erreur updateField:', error);
+          console.error('❌ Erreur updateField:', error);
           throw error;
         }
       },
 
       removeField: async (id) => {
         try {
-          const res = await fetch(`${API_BASE}/fields/${id}`, {
-            method: 'DELETE'
-          });
+          const { error } = await supabase
+            .from('fields')
+            .delete()
+            .eq('id', id);
+
+          if (error) throw error;
           
-          if (!res.ok) throw new Error('Erreur lors de la suppression');
+          await get().loadFields();
           
-          set((state) => ({
-            fields: state.fields.filter((f) => f.id !== id)
-          }));
-          await get().syncFields();
+          // Mettre à jour le nombre de terrains
+          const fieldCount = get().fields.length;
+          await get().updateStat('terrains', fieldCount);
+          
+          console.log('✅ Terrain supprimé');
         } catch (error) {
-          console.error('Erreur removeField:', error);
+          console.error('❌ Erreur removeField:', error);
           throw error;
         }
       },
 
-      // --- Réservations ---
-      addReservation: (r) => {
-        const res: Reservation = { 
-          ...r, 
-          id: uid(), 
-          status: "confirmed", 
-          createdAt: new Date().toISOString() 
-        };
-        set((state) => ({ 
-          reservations: [res, ...state.reservations] 
-        }));
-        return res;
+      // ============================================
+      // RÉSERVATIONS
+      // ============================================
+      addReservation: async (r) => {
+        try {
+          const { data, error } = await supabase
+            .from('reservations')
+            .insert([{
+              field_id: r.fieldId,
+              user_name: r.userName,
+              user_email: r.userEmail,
+              user_phone: r.userPhone,
+              date: r.date,
+              hour: r.hour,
+              price: r.price,
+              status: 'confirmed'
+            }])
+            .select()
+            .single();
+
+          if (error) throw error;
+          
+          const reservation = data as Reservation;
+          set((state) => ({
+            reservations: [reservation, ...state.reservations]
+          }));
+          
+          console.log('✅ Réservation ajoutée:', reservation);
+          return reservation;
+        } catch (error) {
+          console.error('❌ Erreur addReservation:', error);
+          throw error;
+        }
       },
 
       setReservationStatus: async (id, status) => {
         try {
-          const res = await fetch(`${API_BASE}/reservations/${id}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
-          });
-          
-          if (!res.ok) throw new Error('Erreur lors du changement de statut');
-          
-          set((state) => ({
-            reservations: state.reservations.map((r) =>
-              r.id === id ? { ...r, status } : r
-            )
-          }));
-          await get().syncReservations();
+          const { error } = await supabase
+            .from('reservations')
+            .update({ status })
+            .eq('id', id);
+
+          if (error) throw error;
+          await get().loadReservations();
+          console.log('✅ Statut de réservation mis à jour:', { id, status });
         } catch (error) {
-          console.error('Erreur setReservationStatus:', error);
+          console.error('❌ Erreur setReservationStatus:', error);
           throw error;
         }
       },
 
-      // --- Événements ---
-      addEvent: (e) => {
-        const event: PrivateEvent = { 
-          ...e, 
-          id: uid(), 
-          status: "new", 
-          createdAt: new Date().toISOString() 
-        };
-        set((state) => ({
-          events: [event, ...state.events]
-        }));
-        return event;
+      // ============================================
+      // ÉVÉNEMENTS
+      // ============================================
+      addEvent: async (e) => {
+        try {
+          const { data, error } = await supabase
+            .from('private_events')
+            .insert([{
+              first_name: e.firstName,
+              last_name: e.lastName,
+              company: e.company || null,
+              phone: e.phone,
+              email: e.email,
+              date: e.date,
+              guests: e.guests,
+              type: e.type,
+              message: e.message,
+              status: 'new'
+            }])
+            .select()
+            .single();
+
+          if (error) throw error;
+          
+          const event = data as PrivateEvent;
+          set((state) => ({
+            events: [event, ...state.events]
+          }));
+          
+          console.log('✅ Événement ajouté:', event);
+          return event;
+        } catch (error) {
+          console.error('❌ Erreur addEvent:', error);
+          throw error;
+        }
       },
 
       setEventStatus: async (id, status) => {
         try {
-          const res = await fetch(`${API_BASE}/events/${id}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
-          });
-          
-          if (!res.ok) throw new Error('Erreur lors du changement de statut');
-          
-          set((state) => ({
-            events: state.events.map((e) =>
-              e.id === id ? { ...e, status } : e
-            )
-          }));
+          const { error } = await supabase
+            .from('private_events')
+            .update({ status })
+            .eq('id', id);
+
+          if (error) throw error;
           await get().syncEvents();
+          console.log('✅ Statut d\'événement mis à jour:', { id, status });
         } catch (error) {
-          console.error('Erreur setEventStatus:', error);
+          console.error('❌ Erreur setEventStatus:', error);
           throw error;
         }
       },
 
-      // --- Disponibilités ---
+      // ============================================
+      // DISPONIBILITÉS
+      // ============================================
       blockSlot: async (fieldId, date, hour, reason) => {
         try {
-          const res = await fetch(`${API_BASE}/admin/availability/block`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fieldId, date, hour, reason })
-          });
+          const { data, error } = await supabase
+            .from('availability')
+            .insert([{
+              field_id: fieldId,
+              date: date,
+              hour: hour,
+              blocked: true,
+              reason: reason || 'Bloqué par l\'administration'
+            }])
+            .select()
+            .single();
+
+          if (error) throw error;
           
-          if (!res.ok) throw new Error('Erreur lors du blocage');
-          
-          const block = await res.json();
+          const block = data as BlockedSlot;
           set((state) => ({
             blocked: [...state.blocked, block]
           }));
-          await get().syncBlocked();
+          
+          console.log('✅ Créneau bloqué:', block);
           return block;
         } catch (error) {
-          console.error('Erreur blockSlot:', error);
+          console.error('❌ Erreur blockSlot:', error);
           throw error;
         }
       },
 
       unblockSlot: async (id) => {
         try {
-          const res = await fetch(`${API_BASE}/admin/availability/unblock/${id}`, {
-            method: 'DELETE'
-          });
-          
-          if (!res.ok) throw new Error('Erreur lors du déblocage');
+          const { error } = await supabase
+            .from('availability')
+            .delete()
+            .eq('id', id);
+
+          if (error) throw error;
           
           set((state) => ({
             blocked: state.blocked.filter((b) => b.id !== id)
           }));
-          await get().syncBlocked();
+          
+          console.log('✅ Créneau débloqué');
         } catch (error) {
-          console.error('Erreur unblockSlot:', error);
+          console.error('❌ Erreur unblockSlot:', error);
           throw error;
         }
       },
 
-      // --- Notifications ---
+      // ============================================
+      // NOTIFICATIONS
+      // ============================================
       sendNotification: async (n) => {
         try {
-          const res = await fetch(`${API_BASE}/admin/notifications`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(n)
-          });
+          const { data, error } = await supabase
+            .from('notifications')
+            .insert([{
+              title: n.title,
+              body: n.body,
+              audience: n.audience || 'all'
+            }])
+            .select()
+            .single();
+
+          if (error) throw error;
           
-          if (!res.ok) throw new Error('Erreur lors de l\'envoi');
-          
-          const notification = await res.json();
+          const notification = data as AppNotification;
           set((state) => ({
             notifications: [notification, ...state.notifications]
           }));
+          
+          console.log('✅ Notification envoyée:', notification);
           return notification;
         } catch (error) {
-          console.error('Erreur sendNotification:', error);
+          console.error('❌ Erreur sendNotification:', error);
           throw error;
         }
-      }
+      },
+
+      // ============================================
+      // STATISTIQUES
+      // ============================================
+      updateStat: async (key: string, value: number) => {
+        try {
+          const { error } = await supabase
+            .from('stats')
+            .update({ value })
+            .eq('key', key);
+
+          if (error) throw error;
+          await get().loadStats();
+          console.log('✅ Statistique mise à jour:', { key, value });
+        } catch (error) {
+          console.error('❌ Erreur updateStat:', error);
+          throw error;
+        }
+      },
+
+      // ============================================
+      // ÉVALUATIONS
+      // ============================================
+      addRating: async (rating: number, comment?: string) => {
+        try {
+          const { data, error } = await supabase
+            .from('ratings')
+            .insert([{
+              rating,
+              comment: comment || ''
+            }])
+            .select()
+            .single();
+
+          if (error) throw error;
+          
+          await get().loadRatings();
+          console.log('✅ Évaluation ajoutée:', data);
+          return data;
+        } catch (error) {
+          console.error('❌ Erreur addRating:', error);
+          throw error;
+        }
+      },
+
+      // ============================================
+      // ADMIN
+      // ============================================
+      checkAdminAccess: async () => {
+        await get().loadUser();
+        return get().isAdmin;
+      },
+
+      // ============================================
+      // RÉINITIALISATION
+      // ============================================
+      resetStore: () => {
+        set({
+          fields: [],
+          reservations: [],
+          events: [],
+          blocked: [],
+          notifications: [],
+          pricing: DEFAULT_PRICING,
+          stats: [],
+          ratings: [],
+          isLoading: false,
+          isInitialized: false,
+          uploading: false,
+          error: null,
+          user: null,
+          isAdmin: false
+        });
+        // Supprimer les données du localStorage
+        localStorage.removeItem('soccer-city-store');
+        console.log('🗑️ Store Soccer City réinitialisé');
+      },
     }),
     {
       name: 'soccer-city-store',
@@ -450,7 +762,9 @@ export const useAppStore = create<AppState>()(
         events: state.events,
         blocked: state.blocked,
         notifications: state.notifications,
-        pricing: state.pricing
+        pricing: state.pricing,
+        stats: state.stats,
+        ratings: state.ratings
       })
     }
   )

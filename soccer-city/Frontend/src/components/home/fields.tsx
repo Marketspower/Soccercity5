@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { CalendarSearch, CircleParking, DoorOpen, Lightbulb, Ruler, Sprout, Users, Zap } from "lucide-react";
@@ -21,17 +22,16 @@ function Spec({ Icon, label }: { Icon: React.ElementType; label: string }) {
 
 function FieldCard({ field }: { field: Field }) {
   return (
-    <article className="card-hover group overflow-hidden rounded-lg border bg-card">
+    <article className="card-hover group overflow-hidden rounded-xl border bg-card transition-all hover:shadow-glow-sm">
       <div className="relative aspect-[16/10] overflow-hidden">
-        <Image
-          src={field.image}
+        <Image          src={field.image || '/fields/default.svg'}
           alt={`${field.name} — ${field.players}`}
           fill
           loading="lazy"
           sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          className="object-cover transition-transform duration-700 group-hover:scale-105"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80 transition-opacity group-hover:opacity-100" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         <div className="absolute left-4 top-4 flex gap-2">
           <Badge>{field.players}</Badge>
           {field.indoor && <Badge variant="secondary">Intérieur</Badge>}
@@ -71,7 +71,23 @@ function FieldCard({ field }: { field: Field }) {
 }
 
 export function Fields() {
-  const fields = useAppStore((s) => s.fields).filter((f) => f.active);
+  const { fields, loadFields, isLoading } = useAppStore();
+  const activeFields = fields.filter(f => f.active);
+
+  useEffect(() => {
+    loadFields();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section className="container py-16">
+        <div className="text-center">
+          <div className="animate-pulse text-4xl mb-4">⚽</div>
+          <p className="text-muted-foreground">Chargement des terrains...</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="terrains" className="relative py-24 md:py-32">
@@ -81,18 +97,24 @@ export function Fields() {
           <p className="speed-eyebrow mb-4">Nos terrains</p>
           <h2 className="display text-4xl sm:text-5xl">Choisissez votre <span className="text-primary">surface de jeu</span></h2>
           <p className="mt-4 text-muted-foreground">
-            Du 5 contre 5 rapide au 11 contre 11 grand format : chaque terrain est éclairé,
-            entretenu quotidiennement et réservable à l&apos;heure.
+            {activeFields.length} terrains disponibles · Du 5 contre 5 rapide au 11 contre 11 grand format.
           </p>
         </Reveal>
 
-        <Stagger className="grid gap-8 md:grid-cols-2">
-          {fields.map((f) => (
-            <StaggerItem key={f.id}>
-              <FieldCard field={f} />
-            </StaggerItem>
-          ))}
-        </Stagger>
+        {activeFields.length === 0 ? (
+          <div className="text-center py-12 border-2 border-dashed rounded-lg">
+            <p className="text-muted-foreground">Aucun terrain disponible.</p>
+            <p className="text-sm text-muted-foreground">Ajoutez-en depuis l&apos;administration.</p>
+          </div>
+        ) : (
+          <Stagger className="grid gap-8 md:grid-cols-2">
+            {activeFields.map((f) => (
+              <StaggerItem key={f.id}>
+                <FieldCard field={f} />
+              </StaggerItem>
+            ))}
+          </Stagger>
+        )}
       </div>
     </section>
   );

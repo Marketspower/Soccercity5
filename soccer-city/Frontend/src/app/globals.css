@@ -2,13 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   SOCCER CITY — Système de thème
+   Dark = mode principal (fidèle au logo)
+   Light = déclinaison claire
+   ============================================ */
+
 @layer base {
+  /* Thème clair */
   :root {
     --background: 210 25% 98%;
     --foreground: 220 40% 6%;
     --card: 0 0% 100%;
     --card-foreground: 220 40% 6%;
-    --primary: 219 98% 48%;
+    --primary: 219 98% 48%; /* #0357F3 */
     --primary-foreground: 0 0% 100%;
     --secondary: 220 25% 94%;
     --secondary-foreground: 220 40% 10%;
@@ -24,8 +31,9 @@
     --radius: 1rem;
   }
 
+  /* Thème sombre */
   .dark {
-    --background: 210 30% 3%;
+    --background: 210 30% 3%; /* #050607 — noir du logo */
     --foreground: 210 20% 98%;
     --card: 217 30% 6%;
     --card-foreground: 210 20% 98%;
@@ -44,8 +52,13 @@
     --ring: 219 98% 55%;
   }
 
+  /* Styles de base */
   * {
     border-color: hsl(var(--border));
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   body {
@@ -53,10 +66,38 @@
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Sélection */
+  ::selection {
+    background: rgba(3, 87, 243, 0.85);
+    color: #fff;
+  }
+
+  /* Barre de défilement */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.6);
   }
 }
 
+/* ============================================
+   COMPOSANTS
+   ============================================ */
+
 @layer components {
+  /* Titres display — italique « vitesse » */
   .display {
     font-family: var(--font-display, sans-serif);
     font-weight: 800;
@@ -65,6 +106,7 @@
     letter-spacing: -0.025em;
   }
 
+  /* Eyebrow de section : 3 traits de vitesse */
   .speed-eyebrow {
     display: inline-flex;
     align-items: center;
@@ -89,6 +131,7 @@
     transform: skewX(-24deg);
   }
 
+  /* Glassmorphism */
   .glass {
     background: rgba(255, 255, 255, 0.55);
     backdrop-filter: blur(14px) saturate(150%);
@@ -100,6 +143,7 @@
     background: rgba(10, 14, 22, 0.5);
   }
 
+  /* Carte avec élévation au survol */
   .card-hover {
     transition: all 0.3s ease;
     will-change: transform;
@@ -110,6 +154,7 @@
     box-shadow: 0 20px 50px -20px rgba(3, 87, 243, 0.35);
   }
 
+  /* Halo lumineux */
   .glow-ring {
     position: relative;
   }
@@ -127,6 +172,12 @@
     mask-composite: exclude;
   }
 
+  /* Coupe d'angle « slash » */
+  .slash-cut {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+  }
+
+  /* Lien de navigation animé */
   .nav-link {
     position: relative;
     font-size: 0.875rem;
@@ -160,6 +211,7 @@
     color: hsl(var(--foreground));
   }
 
+  /* Texte avec reflet animé */
   .text-shine {
     background: linear-gradient(110deg, hsl(var(--foreground)) 40%, hsl(var(--primary)) 50%, hsl(var(--foreground)) 60%);
     background-size: 200% 100%;
@@ -168,9 +220,71 @@
     color: transparent;
     animation: shine 6s linear infinite;
   }
+
+  /* Prose pour le contenu des pages CMS */
+  .prose {
+    color: hsl(var(--foreground));
+  }
+
+  .prose h1,
+  .prose h2,
+  .prose h3 {
+    font-family: var(--font-display, sans-serif);
+    font-weight: 700;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .prose h1 {
+    font-size: 2rem;
+  }
+
+  .prose h2 {
+    font-size: 1.5rem;
+  }
+
+  .prose h3 {
+    font-size: 1.25rem;
+  }
+
+  .prose p {
+    margin-bottom: 1rem;
+    line-height: 1.8;
+  }
+
+  .prose ul,
+  .prose ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .prose li {
+    margin-bottom: 0.5rem;
+  }
+
+  .prose a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+  }
+
+  .prose a:hover {
+    text-decoration: none;
+  }
+
+  .prose blockquote {
+    border-left: 4px solid hsl(var(--primary));
+    padding-left: 1rem;
+    margin-left: 0;
+    font-style: italic;
+  }
 }
 
+/* ============================================
+   UTILITAIRES
+   ============================================ */
+
 @layer utilities {
+  /* Grille de terrain en filigrane */
   .bg-field-lines {
     background-image:
       linear-gradient(rgba(3, 87, 243, 0.06) 1px, transparent 1px),
@@ -179,11 +293,16 @@
     mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 30%, transparent 75%);
   }
 
+  /* Accélération GPU */
   .gpu {
     transform: translateZ(0);
     backface-visibility: hidden;
   }
 }
+
+/* ============================================
+   ACCESSIBILITÉ
+   ============================================ */
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -193,5 +312,121 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+/* Mobile (max 640px) */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .display {
+    font-size: 2rem !important;
+  }
+
+  h1 {
+    font-size: 1.75rem !important;
+  }
+
+  .glass {
+    backdrop-filter: blur(8px) !important;
+  }
+
+  .speed-eyebrow {
+    font-size: 0.65rem;
+  }
+
+  .speed-eyebrow::before {
+    width: 24px;
+    height: 8px;
+  }
+}
+
+/* Tablette (max 768px) */
+@media (max-width: 768px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .grid-cols-4 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .lg\:grid-cols-\[1fr_1\.3fr\] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .lg\:grid-cols-\[1fr_1\.2fr\] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .lg\:grid-cols-\[200px_1fr\] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .lg\:grid-cols-\[1\.4fr_1fr_1fr_1fr\] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* Mobile touch (écrans tactiles) */
+@media (pointer: coarse) {
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  button,
+  a {
+    min-height: 44px;
+  }
+}
+
+/* Écrans très petits (max 380px) */
+@media (max-width: 380px) {
+  .text-5xl {
+    font-size: 2.25rem !important;
+  }
+
+  .sm\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .gap-4 {
+    gap: 0.75rem !important;
+  }
+
+  .p-6 {
+    padding: 1rem !important;
+  }
+}
+
+/* Orientation paysage sur mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .min-h-screen {
+    min-height: 100vh;
+  }
+
+  .py-24 {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+
+  .pt-28 {
+    padding-top: 5rem;
   }
 }

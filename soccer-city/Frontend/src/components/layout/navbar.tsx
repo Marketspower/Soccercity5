@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { CalendarCheck, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/lib/store";
 
 const LINKS = [
   { href: "/#terrains", label: "Terrains" },
@@ -20,6 +21,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { user, isAdmin } = useAppStore();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -59,15 +61,38 @@ export function Navbar() {
               {l.label}
             </Link>
           ))}
-          <Link
-            href="/admin"
-            className="text-sm font-medium text-white/50 hover:text-white/80 transition-colors"
-          >
-            Admin
-          </Link>
+          {isAdmin ? (
+            <Link
+              href="/admin"
+              className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              👑 Admin
+            </Link>
+          ) : (
+            <Link
+              href="/admin/login"
+              className="text-sm font-medium text-white/50 hover:text-white/80 transition-colors"
+            >
+              🔑 Connexion
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">
+          {user && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={async () => {
+                const { supabase } = await import('@/lib/supabase');
+                await supabase.auth.signOut();
+                window.location.href = '/';
+              }}
+              className="hidden sm:inline-flex text-white/50 hover:text-white text-xs"
+            >
+              Déconnexion
+            </Button>
+          )}
           <Button asChild variant="brand" size="sm" className="hidden sm:inline-flex">
             <Link href="/reservation">
               <CalendarCheck className="size-4" /> Réserver
@@ -98,13 +123,35 @@ export function Navbar() {
                 {l.label}
               </Link>
             ))}
-            <Link
-              href="/admin"
-              className="py-3 text-white/50 hover:text-white/80 transition-colors text-lg font-medium"
-              onClick={() => setOpen(false)}
-            >
-              Administration
-            </Link>
+            {isAdmin ? (
+              <Link
+                href="/admin"
+                className="py-3 text-blue-400 hover:text-blue-300 transition-colors text-lg font-medium"
+                onClick={() => setOpen(false)}
+              >
+                👑 Administration
+              </Link>
+            ) : (
+              <Link
+                href="/admin/login"
+                className="py-3 text-white/50 hover:text-white/80 transition-colors text-lg font-medium"
+                onClick={() => setOpen(false)}
+              >
+                🔑 Connexion
+              </Link>
+            )}
+            {user && (
+              <button
+                onClick={async () => {
+                  const { supabase } = await import('@/lib/supabase');
+                  await supabase.auth.signOut();
+                  window.location.href = '/';
+                }}
+                className="py-3 text-white/40 hover:text-white/60 transition-colors text-left text-lg font-medium"
+              >
+                Déconnexion
+              </button>
+            )}
             <Button asChild variant="brand" className="mt-2 w-full">
               <Link href="/reservation" onClick={() => setOpen(false)}>
                 <CalendarCheck className="size-4" /> Réserver un terrain

@@ -20,5 +20,9 @@
   "..\\node_modules\\@supabase\\storage-js\\dist\\module\\lib\\helpers.js -> @supabase/node-fetch": {
     "id": "..\\node_modules\\@supabase\\storage-js\\dist\\module\\lib\\helpers.js -> @supabase/node-fetch",
     "files": []
+  },
+  "components\\layout\\navbar.tsx -> @/lib/supabase": {
+    "id": "components\\layout\\navbar.tsx -> @/lib/supabase",
+    "files": []
   }
 }

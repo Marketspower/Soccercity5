@@ -26,6 +26,7 @@ export interface Field {
   pricePerHour: number;
   indoor: boolean;
   active: boolean;
+  created_at?: string;
 }
 
 export type ReservationStatus = "pending" | "confirmed" | "cancelled";
@@ -102,4 +103,22 @@ export interface Slot {
   hour: number;
   label: string;
   state: SlotState;
+}
+
+// Nouvelles interfaces pour les statistiques
+export interface Stat {
+  id: string;
+  key: string;
+  value: number;
+  label: string;
+  suffix: string;
+  updated_at: string;
+}
+
+export interface Rating {
+  id: string;
+  user_id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
 }
