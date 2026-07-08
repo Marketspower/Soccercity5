@@ -51,7 +51,7 @@ let io: SocketServer | null = null;
 export const initWebSocket = (server: HttpServer): void => {
   io = new SocketServer(server, {
     cors: {
-      origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+      origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
       methods: ['GET', 'POST'],
       credentials: true
     },
@@ -77,7 +77,6 @@ export const initWebSocket = (server: HttpServer): void => {
     // Écouter les événements personnalisés
     socket.on('custom-event', (data: any) => {
       console.log(`📨 Événement personnalisé de ${socket.id}:`, data);
-      // Broadcast à tous les clients
       io?.emit('custom-event-response', { received: data, timestamp: new Date() });
     });
 
@@ -108,11 +107,9 @@ export const broadcastToClients = (event: string, data: any, room?: string): voi
   };
 
   if (room) {
-    // Envoyer à une salle spécifique
     io.to(room).emit(event, payload);
     console.log(`📡 Broadcast à la salle ${room}:`, { event, payload });
   } else {
-    // Envoyer à tous les clients
     io.emit(event, payload);
     console.log(`📡 Broadcast à tous:`, { event, payload });
   }
@@ -181,7 +178,7 @@ export const setupRealtimeChannels = (): void => {
             old: payload.old
           });
 
-          // 2. Envoyer à une salle spécifique (ex: par terrain)
+          // 2. Envoyer à une salle spécifique (par terrain)
           if (payload.new?.field_id) {
             broadcastToClients(
               `field-${payload.new.field_id}`,
@@ -194,7 +191,7 @@ export const setupRealtimeChannels = (): void => {
             );
           }
 
-          // 3. Envoyer à une salle spécifique (ex: par date)
+          // 3. Envoyer à une salle spécifique (par date)
           if (payload.new?.date) {
             broadcastToClients(
               `date-${payload.new.date}`,
@@ -255,9 +252,6 @@ export const setupRealtimeChannels = (): void => {
 
 /**
  * Envoie une notification en temps réel via Supabase + WebSocket
- * @param channel - Nom du canal Supabase
- * @param event - Type d'événement
- * @param payload - Données à envoyer
  */
 export const broadcastRealtimeUpdate = async (
   channel: string,
@@ -265,7 +259,6 @@ export const broadcastRealtimeUpdate = async (
   payload: any
 ): Promise<void> => {
   try {
-    // 1. Broadcast via Supabase Realtime
     await supabase.channel(channel).send({
       type: 'broadcast',
       event: event,
@@ -276,7 +269,6 @@ export const broadcastRealtimeUpdate = async (
     });
     console.log(`📡 Broadcast Supabase sur ${channel}:`, { event, payload });
 
-    // 2. Broadcast via WebSocket
     broadcastToClients(event, {
       ...payload,
       source: 'supabase'
@@ -291,9 +283,6 @@ export const broadcastRealtimeUpdate = async (
 // FONCTIONS SPÉCIFIQUES DE BROADCAST
 // ============================================
 
-/**
- * Notifie tous les clients d'une nouvelle réservation
- */
 export const notifyNewReservation = (reservation: any): void => {
   broadcastToClients('new-reservation', {
     type: 'reservation',
@@ -302,9 +291,6 @@ export const notifyNewReservation = (reservation: any): void => {
   });
 };
 
-/**
- * Notifie tous les clients d'un changement de statut de réservation
- */
 export const notifyReservationStatusChange = (reservation: any, oldStatus: string): void => {
   broadcastToClients('reservation-status-change', {
     type: 'reservation',
@@ -315,9 +301,6 @@ export const notifyReservationStatusChange = (reservation: any, oldStatus: strin
   });
 };
 
-/**
- * Notifie tous les clients d'une nouvelle demande d'événement
- */
 export const notifyNewEvent = (event: any): void => {
   broadcastToClients('new-event-request', {
     type: 'event',
@@ -326,9 +309,6 @@ export const notifyNewEvent = (event: any): void => {
   });
 };
 
-/**
- * Notifie tous les clients d'un changement de disponibilité
- */
 export const notifyAvailabilityChange = (availability: any): void => {
   broadcastToClients('availability-change', {
     type: 'availability',
@@ -337,9 +317,6 @@ export const notifyAvailabilityChange = (availability: any): void => {
   });
 };
 
-/**
- * Notifie tous les clients d'une mise à jour de terrain
- */
 export const notifyFieldUpdate = (field: any): void => {
   broadcastToClients('field-update', {
     type: 'field',

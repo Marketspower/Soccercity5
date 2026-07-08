@@ -24,17 +24,17 @@ app.use(helmet({
   },
 }));
 
-// Rate limiting - Protection contre les attaques DDoS
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limite chaque IP à 100 requêtes par fenêtre
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Trop de requêtes, veuillez réessayer plus tard.',
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use('/api', limiter);
 
-// CORS - Autoriser le frontend
+// CORS
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
 app.use(cors({
   origin: (origin, callback) => {
@@ -53,7 +53,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging des requêtes
+// Logging
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`📝 ${req.method} ${req.url}`);
   next();
@@ -83,11 +83,10 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// Gestion des erreurs globale
+// Gestion des erreurs
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('❌ Erreur:', err);
   
-  // Erreur de validation
   if (err.name === 'ValidationError') {
     return res.status(400).json({
       error: 'Erreur de validation',
@@ -95,7 +94,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     });
   }
 
-  // Erreur de base de données (duplicate key)
   if (err.code === '23505') {
     return res.status(409).json({
       error: 'Conflit de données',
@@ -103,7 +101,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     });
   }
 
-  // Erreur inconnue
   res.status(500).json({
     error: 'Erreur serveur',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Une erreur est survenue'
