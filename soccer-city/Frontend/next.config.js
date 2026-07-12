@@ -3,8 +3,13 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     dangerouslyAllowSVG: true,
-    domains: ['your-project.supabase.co'],
     remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'ofbhcuqhaygxhfqwbyxb.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
       {
         protocol: 'https',
         hostname: '**',
@@ -12,7 +17,7 @@ const nextConfig = {
     ],
   },
   experimental: {
-    optimizeCss: true,
+    optimizeCss: false,
   },
 };
 

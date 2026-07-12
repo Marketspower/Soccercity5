@@ -11,6 +11,7 @@ import { useAppStore } from "@/lib/store";
 import { formatCAD } from "@/lib/utils";
 import type { Field } from "@/lib/types";
 
+// Composant Spec pour les caractéristiques
 function Spec({ Icon, label }: { Icon: React.ElementType; label: string }) {
   return (
     <li className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -20,11 +21,13 @@ function Spec({ Icon, label }: { Icon: React.ElementType; label: string }) {
   );
 }
 
+// Carte d'un terrain
 function FieldCard({ field }: { field: Field }) {
   return (
     <article className="card-hover group overflow-hidden rounded-xl border bg-card transition-all hover:shadow-glow-sm">
       <div className="relative aspect-[16/10] overflow-hidden">
-        <Image          src={field.image || '/fields/default.svg'}
+        <Image
+          src={field.image || '/fields/field-1.svg'}
           alt={`${field.name} — ${field.players}`}
           fill
           loading="lazy"
@@ -37,7 +40,8 @@ function FieldCard({ field }: { field: Field }) {
           {field.indoor && <Badge variant="secondary">Intérieur</Badge>}
         </div>
         <p className="absolute bottom-4 right-4 rounded-md glass px-3 py-1.5 font-display text-lg font-extrabold italic text-white">
-          {formatCAD(field.pricePerHour)}<span className="text-xs font-medium not-italic text-white/70"> / h</span>
+          {formatCAD(field.pricePerHour)}
+          <span className="text-xs font-medium not-italic text-white/70"> / h</span>
         </p>
       </div>
 
@@ -56,12 +60,12 @@ function FieldCard({ field }: { field: Field }) {
         <div className="mt-6 flex gap-3">
           <Button asChild variant="outline" className="flex-1">
             <Link href={`/reservation?terrain=${field.id}`}>
-              <CalendarSearch /> Disponibilités
+              <CalendarSearch className="size-4" /> Disponibilités
             </Link>
           </Button>
           <Button asChild variant="brand" className="flex-1">
             <Link href={`/reservation?terrain=${field.id}`}>
-              <Zap /> Réserver
+              <Zap className="size-4" /> Réserver
             </Link>
           </Button>
         </div>
@@ -70,13 +74,21 @@ function FieldCard({ field }: { field: Field }) {
   );
 }
 
+// Composant principal Fields
 export function Fields() {
   const { fields, loadFields, isLoading } = useAppStore();
-  const activeFields = fields.filter(f => f.active);
 
   useEffect(() => {
+    console.log('🔄 Chargement des terrains...');
     loadFields();
   }, []);
+
+  useEffect(() => {
+    console.log('📊 Terrains dans le store:', fields);
+  }, [fields]);
+
+  // Filtrer les terrains actifs
+  const activeFields = fields.filter(f => f.active);
 
   if (isLoading) {
     return (
@@ -89,32 +101,41 @@ export function Fields() {
     );
   }
 
+  if (activeFields.length === 0) {
+    return (
+      <section className="container py-16">
+        <h2 className="text-3xl font-bold text-center mb-8">
+          Nos <span className="text-primary">terrains</span>
+        </h2>
+        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+          <p className="text-muted-foreground">Aucun terrain disponible.</p>
+          <p className="text-sm text-muted-foreground">Ajoutez-en depuis l&apos;administration.</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="terrains" className="relative py-24 md:py-32">
       <div className="pointer-events-none absolute inset-0 bg-field-lines" aria-hidden />
       <div className="container relative">
         <Reveal className="mb-14 max-w-2xl">
           <p className="speed-eyebrow mb-4">Nos terrains</p>
-          <h2 className="display text-4xl sm:text-5xl">Choisissez votre <span className="text-primary">surface de jeu</span></h2>
+          <h2 className="display text-4xl sm:text-5xl">
+            Choisissez votre <span className="text-primary">surface de jeu</span>
+          </h2>
           <p className="mt-4 text-muted-foreground">
             {activeFields.length} terrains disponibles · Du 5 contre 5 rapide au 11 contre 11 grand format.
           </p>
         </Reveal>
 
-        {activeFields.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed rounded-lg">
-            <p className="text-muted-foreground">Aucun terrain disponible.</p>
-            <p className="text-sm text-muted-foreground">Ajoutez-en depuis l&apos;administration.</p>
-          </div>
-        ) : (
-          <Stagger className="grid gap-8 md:grid-cols-2">
-            {activeFields.map((f) => (
-              <StaggerItem key={f.id}>
-                <FieldCard field={f} />
-              </StaggerItem>
-            ))}
-          </Stagger>
-        )}
+        <Stagger className="grid gap-8 md:grid-cols-2">
+          {activeFields.map((f) => (
+            <StaggerItem key={f.id}>
+              <FieldCard field={f} />
+            </StaggerItem>
+          ))}
+        </Stagger>
       </div>
     </section>
   );

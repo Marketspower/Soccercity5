@@ -22,63 +22,82 @@ export default function AdminLogin() {
     setSuccess(false);
 
     try {
+      console.log("🔐 Tentative de connexion avec:", email);
+
+      // 1. Connexion avec Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erreur connexion:", error);
+        setError(error.message || "Erreur de connexion");
+        setLoading(false);
+        return;
+      }
 
-      // Vérifier si l'utilisateur est admin
+      console.log("✅ Utilisateur connecté:", data.user?.id);
+
+      // 2. Vérifier le rôle admin dans la table users
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('role')
         .eq('id', data.user.id)
-        .single();
+        .maybeSingle();
 
       if (userError) {
-        console.error('Erreur vérification rôle:', userError);
-        if (userError.code === 'PGRST116') {
-          // Créer l'utilisateur dans la table users
-          await supabase
-            .from('users')
-            .insert([{
-              id: data.user.id,
-              email: data.user.email,
-              first_name: 'Admin',
-              last_name: 'Soccer City',
-              role: 'admin',
-              phone: '+1 (450) 555-0192'
-            }]);
-          
-          const { data: newUserData } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', data.user.id)
-            .single();
-          
-          if (newUserData?.role === 'admin') {
-            setSuccess(true);
-            setTimeout(() => router.push('/admin'), 500);
-            return;
-          }
-        }
+        console.error("❌ Erreur vérification rôle:", userError);
         setError("Erreur lors de la vérification des droits");
         setLoading(false);
         return;
       }
 
-      if (userData?.role !== 'admin') {
-        await supabase.auth.signOut();
+      console.log("📊 Rôle utilisateur:", userData);
+
+      // 3. Si l'utilisateur n'existe pas dans la table users
+      if (!userData) {
+        console.log("⚠️ Utilisateur non trouvé dans users, création...");
+        
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            first_name: 'Admin',
+            last_name: 'Soccer City',
+            role: 'admin',
+            phone: '+1 (450) 555-0192'
+          });
+
+        if (insertError) {
+          console.error("❌ Erreur insertion:", insertError);
+          setError("Erreur lors de la création de l'utilisateur");
+          setLoading(false);
+          return;
+        }
+
+        console.log("✅ Admin créé avec succès");
+        setSuccess(true);
+        setTimeout(() => router.push('/admin'), 1000);
+        setLoading(false);
+        return;
+      }
+
+      // 4. Vérifier le rôle
+      if (userData.role !== 'admin') {
+        console.log("❌ Rôle non admin:", userData.role);
         setError("Accès non autorisé. Vous devez être administrateur.");
         setLoading(false);
         return;
       }
 
+      console.log("✅ Connexion admin réussie !");
       setSuccess(true);
-      setTimeout(() => router.push('/admin'), 500);
+      setTimeout(() => router.push('/admin'), 1000);
       
     } catch (error: any) {
+      console.error("❌ Erreur:", error);
       setError(error.message || "Erreur de connexion");
     } finally {
       setLoading(false);
@@ -109,8 +128,8 @@ export default function AdminLogin() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@soccercity.ca"
-                  className="bg-white/10 border-white/10 text-white placeholder:text-white/30"
+                  placeholder="agencemarketspower@gmail.com"
+                  className="bg-white/10 border-white/10 text-white"
                   required
                   autoFocus
                 />
@@ -123,7 +142,7 @@ export default function AdminLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="bg-white/10 border-white/10 text-white placeholder:text-white/30"
+                  className="bg-white/10 border-white/10 text-white"
                   required
                 />
               </div>
@@ -134,25 +153,9 @@ export default function AdminLogin() {
                 </div>
               )}
 
-              <Button
-                type="submit"
-                variant="brand"
-                className="w-full"
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                    Connexion en cours...
-                  </span>
-                ) : (
-                  "Se connecter"
-                )}
+              <Button type="submit" variant="brand" className="w-full" disabled={loading}>
+                {loading ? "Connexion en cours..." : "Se connecter"}
               </Button>
-
-              <p className="text-xs text-white/20 text-center">
-                Accès réservé aux administrateurs
-              </p>
             </form>
           )}
         </div>

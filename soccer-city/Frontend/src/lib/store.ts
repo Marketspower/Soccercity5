@@ -16,7 +16,10 @@ import type {
   Rating
 } from "./types";
 
-// Données par défaut pour le pricing (si aucune donnée en base)
+// API Backend URL
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+// Données par défaut pour le pricing
 const DEFAULT_PRICING: PricingPlan[] = [
   {
     id: "p1",
@@ -37,7 +40,6 @@ const DEFAULT_PRICING: PricingPlan[] = [
 ];
 
 interface AppState {
-  // État
   fields: Field[];
   reservations: Reservation[];
   events: PrivateEvent[];
@@ -53,12 +55,10 @@ interface AppState {
   user: any | null;
   isAdmin: boolean;
 
-  // Initialisation
   loadInitialData: () => Promise<void>;
   loadUser: () => Promise<void>;
   setupRealtime: () => void;
 
-  // Synchronisation
   syncFields: () => Promise<void>;
   syncReservations: () => Promise<void>;
   syncEvents: () => Promise<void>;
@@ -67,48 +67,35 @@ interface AppState {
   syncStats: () => Promise<void>;
   syncRatings: () => Promise<void>;
 
-  // Chargement
   loadFields: () => Promise<void>;
   loadStats: () => Promise<void>;
   loadRatings: () => Promise<void>;
   loadReservations: () => Promise<void>;
 
-  // Terrains
   addField: (f: Omit<Field, "id" | "created_at">) => Promise<Field>;
   updateField: (id: string, patch: Partial<Field>) => Promise<Field>;
   removeField: (id: string) => Promise<void>;
 
-  // Upload d'images
   uploadFieldImage: (file: File) => Promise<string>;
 
-  // Réservations
   addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status">) => Promise<Reservation>;
   setReservationStatus: (id: string, status: ReservationStatus) => Promise<void>;
 
-  // Événements
   addEvent: (e: Omit<PrivateEvent, "id" | "createdAt" | "status">) => Promise<PrivateEvent>;
   setEventStatus: (id: string, status: EventStatus) => Promise<void>;
 
-  // Disponibilités
   blockSlot: (fieldId: string, date: string, hour: number, reason: string) => Promise<BlockedSlot>;
   unblockSlot: (id: string) => Promise<void>;
 
-  // Notifications
   sendNotification: (n: Omit<AppNotification, "id" | "sentAt">) => Promise<AppNotification>;
 
-  // Statistiques
   updateStat: (key: string, value: number) => Promise<void>;
-
-  // Évaluations
   addRating: (rating: number, comment?: string) => Promise<void>;
-
-  // Admin
   checkAdminAccess: () => Promise<boolean>;
-
-  // Réinitialisation
   resetStore: () => void;
 }
 
+// Création du store
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -153,10 +140,8 @@ export const useAppStore = create<AppState>()(
         set({ isLoading: true, error: null });
         
         try {
-          // Charger l'utilisateur
           await get().loadUser();
 
-          // Charger toutes les données
           await Promise.all([
             get().loadFields(),
             get().loadReservations(),
@@ -167,7 +152,6 @@ export const useAppStore = create<AppState>()(
             get().loadRatings()
           ]);
 
-          // Configurer Realtime
           get().setupRealtime();
 
           set({ isInitialized: true, isLoading: false });
@@ -188,7 +172,6 @@ export const useAppStore = create<AppState>()(
       setupRealtime: () => {
         console.log('📡 Configuration des canaux Realtime...');
 
-        // Terrains
         supabase
           .channel('fields-changes')
           .on('postgres_changes', 
@@ -199,7 +182,6 @@ export const useAppStore = create<AppState>()(
             })
           .subscribe();
 
-        // Réservations
         supabase
           .channel('reservations-changes')
           .on('postgres_changes', 
@@ -210,7 +192,6 @@ export const useAppStore = create<AppState>()(
             })
           .subscribe();
 
-        // Statistiques
         supabase
           .channel('stats-changes')
           .on('postgres_changes', 
@@ -221,7 +202,6 @@ export const useAppStore = create<AppState>()(
             })
           .subscribe();
 
-        // Évaluations
         supabase
           .channel('ratings-changes')
           .on('postgres_changes', 
@@ -303,15 +283,33 @@ export const useAppStore = create<AppState>()(
       // ============================================
       loadFields: async () => {
         try {
-          const { data, error } = await supabase
-            .from('fields')
-            .select('*')
-            .order('created_at', { ascending: true });
+          console.log('🔄 Chargement des terrains via API...');
+          const response = await fetch(`${API_BASE}/fields`);
           
-          if (error) throw error;
-          set({ fields: data || [] });
+          if (!response.ok) {
+            throw new Error(`Erreur HTTP: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          console.log('✅ Terrains reçus:', data);
+          set({ fields: data });
         } catch (error) {
-          console.error('❌ Erreur loadFields:', error);
+          console.error('❌ Erreur API loadFields:', error);
+          // Fallback vers Supabase
+          try {
+            console.log('🔄 Fallback: chargement depuis Supabase...');
+            const { data, error: supabaseError } = await supabase
+              .from('fields')
+              .select('*')
+              .order('created_at', { ascending: true });
+            
+            if (supabaseError) throw supabaseError;
+            console.log('✅ Terrains depuis Supabase:', data);
+            set({ fields: data || [] });
+          } catch (supabaseError) {
+            console.error('❌ Erreur Supabase loadFields:', supabaseError);
+            set({ fields: [] });
+          }
         }
       },
 
@@ -425,7 +423,6 @@ export const useAppStore = create<AppState>()(
           
           await get().loadFields();
           
-          // Mettre à jour le nombre de terrains
           const fieldCount = get().fields.length;
           await get().updateStat('terrains', fieldCount);
           
@@ -480,7 +477,6 @@ export const useAppStore = create<AppState>()(
           
           await get().loadFields();
           
-          // Mettre à jour le nombre de terrains
           const fieldCount = get().fields.length;
           await get().updateStat('terrains', fieldCount);
           
@@ -749,7 +745,6 @@ export const useAppStore = create<AppState>()(
           user: null,
           isAdmin: false
         });
-        // Supprimer les données du localStorage
         localStorage.removeItem('soccer-city-store');
         console.log('🗑️ Store Soccer City réinitialisé');
       },
@@ -769,3 +764,13 @@ export const useAppStore = create<AppState>()(
     }
   )
 );
+
+// ============================================
+// EXPOSER LE STORE GLOBALEMENT POUR LE DÉBOGAGE
+// ============================================
+// Cette ligne permet d'accéder au store depuis la console du navigateur
+if (typeof window !== 'undefined') {
+  // @ts-ignore - Ignorer l'erreur TypeScript pour le débogage
+  window.__STORE = useAppStore;
+  console.log('🔧 Store exposé globalement. Utilisez window.__STORE.getState()');
+}

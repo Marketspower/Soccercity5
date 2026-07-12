@@ -35,7 +35,7 @@ export default function AdminUsers() {
       }
     }
     
-    // Correction ici : convertir en tableau avant de trier
+    // Correction : utiliser Array.from() au lieu de spread operator
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [reservations]);
 

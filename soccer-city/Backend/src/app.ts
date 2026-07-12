@@ -34,19 +34,12 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// CORS
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
+// CORS - CORRIGÉ
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: '*', // Pour le développement - en production, spécifiez votre domaine
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
 }));
 
 // Body parsing
@@ -88,17 +81,19 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('❌ Erreur:', err);
   
   if (err.name === 'ValidationError') {
-    return res.status(400).json({
+    res.status(400).json({
       error: 'Erreur de validation',
       details: err.message
     });
+    return;
   }
 
   if (err.code === '23505') {
-    return res.status(409).json({
+    res.status(409).json({
       error: 'Conflit de données',
       details: 'Cette entrée existe déjà'
     });
+    return;
   }
 
   res.status(500).json({
