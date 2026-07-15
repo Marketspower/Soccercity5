@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import {
   Briefcase,
   Cake,
@@ -13,7 +14,6 @@ import {
 } from "lucide-react";
 import type { EventType } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
-import { EventForm } from "@/components/events/event-form";
 
 const TYPES: {
   Icon: typeof Cake;
@@ -60,30 +60,14 @@ const TYPES: {
 ];
 
 export function EventOptions() {
-  const [selectedType, setSelectedType] = useState<EventType>();
   const [showFields, setShowFields] = useState(false);
   const [selectedFieldId, setSelectedFieldId] = useState<string>();
-
-  const formRef = useRef<HTMLDivElement>(null);
 
   const { fields } = useAppStore();
 
   const availableFields = Array.isArray(fields)
     ? fields.filter((field) => field.active).slice(0, 2)
     : [];
-
-  function chooseEvent(type: EventType) {
-    setSelectedType(type);
-    setShowFields(false);
-    setSelectedFieldId(undefined);
-
-    setTimeout(() => {
-      formRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 100);
-  }
 
   function chooseField(fieldId: string) {
     setSelectedFieldId(fieldId);
@@ -93,17 +77,14 @@ export function EventOptions() {
     <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {TYPES.map(({ Icon, title, text, terrain }) => (
-          <button
+          <Link
             key={title}
-            type="button"
-            onClick={() => chooseEvent(title)}
+            href={`/reservation?type=${encodeURIComponent(title)}`}
             className="card-hover flex h-full flex-col rounded-lg border bg-card p-5 text-left transition hover:border-primary"
           >
             <Icon className="mb-3 size-7 text-primary" />
 
-            <h2 className="font-display text-lg font-bold">
-              {title}
-            </h2>
+            <h2 className="font-display text-lg font-bold">{title}</h2>
 
             <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
               {text}
@@ -116,14 +97,13 @@ export function EventOptions() {
             <span className="mt-5 inline-flex items-center font-semibold text-primary">
               Choisir cet événement →
             </span>
-          </button>
+          </Link>
         ))}
 
         <button
           type="button"
           onClick={() => {
             setShowFields(true);
-            setSelectedType(undefined);
             setSelectedFieldId(undefined);
           }}
           className="card-hover flex h-full flex-col rounded-lg border bg-card p-5 text-left transition hover:border-primary"
@@ -192,15 +172,9 @@ export function EventOptions() {
                     <p>Dimensions : {field.dimensions}</p>
                     <p>Surface : {field.turf}</p>
                     <p>Joueurs : {field.players}</p>
-                    <p>
-                      Éclairage LED : {field.lighting ? "Oui" : "Non"}
-                    </p>
-                    <p>
-                      Vestiaires : {field.lockerRooms}
-                    </p>
-                    <p>
-                      Stationnement : {field.parking ? "Oui" : "Non"}
-                    </p>
+                    <p>Éclairage LED : {field.lighting ? "Oui" : "Non"}</p>
+                    <p>Vestiaires : {field.lockerRooms}</p>
+                    <p>Stationnement : {field.parking ? "Oui" : "Non"}</p>
                   </div>
 
                   <p className="mt-5 text-xl font-bold text-primary">
@@ -233,36 +207,6 @@ export function EventOptions() {
               </p>
             </div>
           )}
-        </section>
-      )}
-
-      {selectedType && (
-        <section ref={formRef} className="scroll-mt-28 mt-16">
-          <div className="mx-auto mb-8 max-w-2xl text-center">
-            <h2 className="display text-3xl sm:text-4xl">
-              Réserver pour :{" "}
-              <span className="text-primary">
-                {selectedType}
-              </span>
-            </h2>
-
-            <p className="mt-3 text-muted-foreground">
-              Remplissez le formulaire. Notre équipe vous attribuera le terrain
-              le plus adapté selon le type d’événement et le nombre de
-              participants.
-            </p>
-
-            <div className="mt-5 rounded-lg border border-primary/30 bg-primary/10 p-4">
-              <p className="font-semibold text-primary">
-                Système de réservation en cours de construction pour tous les
-                événements.
-              </p>
-            </div>
-          </div>
-
-          <div className="mx-auto max-w-3xl">
-            <EventForm selectedType={selectedType} />
-          </div>
         </section>
       )}
     </>

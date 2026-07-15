@@ -3,5 +3,5 @@
   "/page": "app/page.js",
   "/evenements/page": "app/evenements/page.js",
   "/[slug]/page": "app/[slug]/page.js",
-  "/admin/login/page": "app/admin/login/page.js"
+  "/reservation/page": "app/reservation/page.js"
 }

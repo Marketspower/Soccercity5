@@ -1337,9 +1337,6 @@ video {
 .cursor-pointer {
   cursor: pointer;
 }
-.scroll-mt-28 {
-  scroll-margin-top: 7rem;
-}
 .appearance-none {
   -webkit-appearance: none;
      -moz-appearance: none;
