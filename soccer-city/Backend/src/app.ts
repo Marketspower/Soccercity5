@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import fieldRoutes from './routes/fields';
+import fieldRoutes from './routes/galleryRoutes';
 import reservationRoutes from './routes/reservations';
 import eventRoutes from './routes/events';
 import adminRoutes from './routes/admin';
