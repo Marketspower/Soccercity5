@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -18,50 +19,27 @@ model User {
   
   reservations  Reservation[]
   notifications Notification[] @relation("NotificationSender")
+  ratings       Rating[]
+  reviews       Review[]
 
   @@map("users")
 }
 
-model Field {
-  id              String       @id @default(cuid())
-  name            String
-  slug            String       @unique
-  imageUrl        String?      @map("image_url")
-  dimensions      String
-  turf            String
-  lighting        Boolean      @default(true)
-  lockerRooms     Int          @default(2) @map("locker_rooms")
-  parking         Boolean      @default(true)
-  players         String
-  pricePerHour    Float        @map("price_per_hour")
-  indoor          Boolean      @default(false)
-  active          Boolean      @default(true)
-  createdAt       DateTime     @default(now()) @map("created_at")
-  
-  reservations    Reservation[]
-  availability    Availability[]
-  reviews         Review[]
-
-  @@map("fields")
-}
-
 model Reservation {
   id            String   @id @default(cuid())
-  fieldId       String   @map("field_id")
   userId        String?  @map("user_id")
   userName      String   @map("user_name")
   userEmail     String   @map("user_email")
   userPhone     String   @map("user_phone")
-  date          String   // Format "YYYY-MM-DD"
+  date          String
   hour          Int
   price         Float
   status        String   @default("confirmed")
   createdAt     DateTime @default(now()) @map("created_at")
   
-  field         Field    @relation(fields: [fieldId], references: [id])
   user          User?    @relation(fields: [userId], references: [id])
 
-  @@unique([fieldId, date, hour])
+  @@unique([date, hour])
   @@map("reservations")
 }
 
@@ -78,21 +56,22 @@ model PrivateEvent {
   message     String
   status      String   @default("new")
   createdAt   DateTime @default(now()) @map("created_at")
+  
+  // Relations avec les médias
+  media       Media[]
+  gallery     Gallery[]
 
   @@map("private_events")
 }
 
 model Availability {
   id          String   @id @default(cuid())
-  fieldId     String   @map("field_id")
   date        String
   hour        Int
   blocked     Boolean  @default(true)
   reason      String?
-  
-  field       Field    @relation(fields: [fieldId], references: [id])
 
-  @@unique([fieldId, date, hour])
+  @@unique([date, hour])
   @@map("availability")
 }
 
@@ -106,20 +85,46 @@ model Review {
   approved    Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
   
-  field       Field?   @relation(fields: [fieldId], references: [id])
-  fieldId     String?  @map("field_id")
+  user        User?    @relation(fields: [userId], references: [id])
 
   @@map("reviews")
 }
 
+// ============================================
+// GALLERY - Pour les images
+// ============================================
 model Gallery {
   id          String   @id @default(cuid())
   imageUrl    String   @map("image_url")
   alt         String
   sortOrder   Int      @default(0) @map("sort_order")
+  eventId     String?  @map("event_id")
   createdAt   DateTime @default(now()) @map("created_at")
+  
+  event       PrivateEvent? @relation(fields: [eventId], references: [id])
 
   @@map("gallery")
+}
+
+// ============================================
+// MEDIA - Pour les vidéos et autres médias
+// ============================================
+model Media {
+  id          String   @id @default(cuid())
+  title       String
+  url         String
+  type        String   // 'video', 'photo', 'audio'
+  thumbnail   String?  // URL de la vignette
+  duration    String?  // Durée de la vidéo
+  description String?
+  isFeatured  Boolean  @default(false)
+  eventId     String?  @map("event_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  event       PrivateEvent? @relation(fields: [eventId], references: [id])
+
+  @@map("media")
 }
 
 model Setting {
@@ -135,10 +140,44 @@ model Notification {
   title       String
   body        String
   audience    String   @default("all")
-  sentById    String?  @map("sent_by")
+  sentById    String?  @map("sent_by") 
   sentAt      DateTime @default(now()) @map("sent_at")
   
   sentBy      User?    @relation("NotificationSender", fields: [sentById], references: [id])
 
   @@map("notifications")
+}
+
+model Stats {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Int      @default(0)
+  label       String
+  suffix      String   @default("")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  @@map("stats")
+}
+
+model Rating {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@map("ratings")
+}
+
+model Page {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  content     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  @@map("pages")
 }
