@@ -19,31 +19,10 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 -- ============================================
--- 2. TABLE FIELDS (Terrains)
--- ============================================
-CREATE TABLE IF NOT EXISTS public.fields (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL,
-    slug TEXT UNIQUE NOT NULL,
-    image_url TEXT,
-    dimensions TEXT NOT NULL,
-    turf TEXT NOT NULL,
-    lighting BOOLEAN NOT NULL DEFAULT true,
-    locker_rooms INT NOT NULL DEFAULT 2,
-    parking BOOLEAN NOT NULL DEFAULT true,
-    players TEXT NOT NULL,
-    price_per_hour DECIMAL(8,2) NOT NULL,
-    indoor BOOLEAN NOT NULL DEFAULT false,
-    active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ============================================
--- 3. TABLE RESERVATIONS
+-- 2. TABLE RESERVATIONS (sans field_id)
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.reservations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    field_id UUID NOT NULL REFERENCES public.fields(id) ON DELETE CASCADE,
     user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     user_name TEXT NOT NULL,
     user_email TEXT NOT NULL,
@@ -53,16 +32,15 @@ CREATE TABLE IF NOT EXISTS public.reservations (
     price DECIMAL(8,2) NOT NULL,
     status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT unique_slot UNIQUE (field_id, date, hour)
+    CONSTRAINT unique_slot UNIQUE (date, hour)
 );
 
-CREATE INDEX idx_reservations_field_date ON public.reservations(field_id, date);
 CREATE INDEX idx_reservations_user ON public.reservations(user_id);
 CREATE INDEX idx_reservations_status ON public.reservations(status);
 CREATE INDEX idx_reservations_date ON public.reservations(date);
 
 -- ============================================
--- 4. TABLE PRIVATE_EVENTS
+-- 3. TABLE PRIVATE_EVENTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.private_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -83,22 +61,21 @@ CREATE INDEX idx_events_status ON public.private_events(status);
 CREATE INDEX idx_events_date ON public.private_events(date);
 
 -- ============================================
--- 5. TABLE AVAILABILITY (Disponibilités)
+-- 4. TABLE AVAILABILITY (sans field_id)
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.availability (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    field_id UUID NOT NULL REFERENCES public.fields(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     hour INT NOT NULL CHECK (hour BETWEEN 8 AND 22),
     blocked BOOLEAN NOT NULL DEFAULT true,
     reason TEXT,
-    CONSTRAINT unique_block UNIQUE (field_id, date, hour)
+    CONSTRAINT unique_block UNIQUE (date, hour)
 );
 
-CREATE INDEX idx_availability_field_date ON public.availability(field_id, date);
+CREATE INDEX idx_availability_date ON public.availability(date);
 
 -- ============================================
--- 6. TABLE PRICING (Tarifs)
+-- 5. TABLE PRICING (Tarifs)
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.pricing (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -112,12 +89,11 @@ CREATE TABLE IF NOT EXISTS public.pricing (
 );
 
 -- ============================================
--- 7. TABLE REVIEWS (Avis)
+-- 6. TABLE REVIEWS (Avis) - sans field_id
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-    field_id UUID REFERENCES public.fields(id) ON DELETE SET NULL,
     author TEXT NOT NULL,
     role TEXT,
     rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
@@ -130,15 +106,38 @@ CREATE INDEX idx_reviews_approved ON public.reviews(approved);
 CREATE INDEX idx_reviews_rating ON public.reviews(rating);
 
 -- ============================================
--- 8. TABLE GALLERY (Galerie)
+-- 7. TABLE GALLERY (avec event_id)
 -- ============================================
 CREATE TABLE IF NOT EXISTS public.gallery (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     image_url TEXT NOT NULL,
     alt TEXT NOT NULL,
     sort_order INT NOT NULL DEFAULT 0,
+    event_id UUID REFERENCES public.private_events(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_gallery_event ON public.gallery(event_id);
+
+-- ============================================
+-- 8. TABLE MEDIA (avec event_id)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.media (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('video', 'photo', 'audio')),
+    thumbnail TEXT,
+    duration TEXT,
+    description TEXT,
+    is_featured BOOLEAN NOT NULL DEFAULT false,
+    event_id UUID REFERENCES public.private_events(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_media_event ON public.media(event_id);
+CREATE INDEX idx_media_featured ON public.media(is_featured);
 
 -- ============================================
 -- 9. TABLE SETTINGS (Paramètres)
@@ -207,13 +206,6 @@ INSERT INTO public.stats (key, value, label, suffix) VALUES
 ('annees_experience', 8, 'Années d''expérience', '+'),
 ('terrains', 4, 'Terrains', '')
 ON CONFLICT (key) DO NOTHING;
-
--- Insertion des terrains
-INSERT INTO public.fields (name, slug, image_url, dimensions, turf, lighting, locker_rooms, parking, players, price_per_hour, indoor, active) VALUES
-('Terrain Alpha', 'alpha', '/fields/field-1.svg', '40 × 20 m', 'Gazon synthétique 5G', true, 2, true, '5 vs 5', 90, true, true),
-('Terrain Vitesse', 'vitesse', '/fields/field-2.svg', '42 × 22 m', 'Gazon synthétique hybride', true, 2, true, '5 vs 5', 95, true, true),
-('Terrain Élite', 'elite', '/fields/field-3.svg', '60 × 40 m', 'Gazon synthétique 5G', true, 4, true, '7 vs 7', 140, false, true),
-('Grand Stade', 'grand-stade', '/fields/field-4.svg', '100 × 64 m', 'Gazon naturel', true, 6, true, '11 vs 11', 240, false, true);
 
 -- Insertion des tarifs
 INSERT INTO public.pricing (name, price, unit, features, highlighted, sort_order) VALUES
@@ -292,13 +284,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reservations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.private_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.availability ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pricing ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.gallery ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.media ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stats ENABLE ROW LEVEL SECURITY;
@@ -309,13 +301,13 @@ ALTER TABLE public.pages ENABLE ROW LEVEL SECURITY;
 -- POLITIQUES DE LECTURE PUBLIQUE
 -- ============================================
 
-CREATE POLICY "Lecture publique des terrains" ON public.fields
-    FOR SELECT USING (true);
-
 CREATE POLICY "Lecture publique des tarifs" ON public.pricing
     FOR SELECT USING (true);
 
 CREATE POLICY "Lecture publique de la galerie" ON public.gallery
+    FOR SELECT USING (true);
+
+CREATE POLICY "Lecture publique des médias" ON public.media
     FOR SELECT USING (true);
 
 CREATE POLICY "Lecture publique des avis approuvés" ON public.reviews
@@ -356,9 +348,6 @@ CREATE POLICY "Création publique des évaluations" ON public.ratings
 -- POLITIQUES ADMIN
 -- ============================================
 
-CREATE POLICY "Admin gestion des terrains" ON public.fields
-    FOR ALL USING (public.is_admin());
-
 CREATE POLICY "Admin gestion des tarifs" ON public.pricing
     FOR ALL USING (public.is_admin());
 
@@ -371,33 +360,41 @@ CREATE POLICY "Admin gestion des utilisateurs" ON public.users
 CREATE POLICY "Admin gestion des pages" ON public.pages
     FOR ALL USING (public.is_admin());
 
+CREATE POLICY "Admin gestion de la galerie" ON public.gallery
+    FOR ALL USING (public.is_admin());
+
+CREATE POLICY "Admin gestion des médias" ON public.media
+    FOR ALL USING (public.is_admin());
+
 -- ============================================
 -- STORAGE - Buckets et politiques
 -- ============================================
 
--- Créer le bucket pour les images
+-- Créer les buckets
 INSERT INTO storage.buckets (id, name, public) 
-VALUES ('images', 'images', true)
+VALUES 
+    ('images', 'images', true),
+    ('media', 'media', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Politiques de storage
+-- Politiques de storage pour images
 CREATE POLICY "Lecture publique des images" ON storage.objects
-    FOR SELECT USING (bucket_id = 'images');
+    FOR SELECT USING (bucket_id = 'images' OR bucket_id = 'media');
 
 CREATE POLICY "Upload authentifié des images" ON storage.objects
     FOR INSERT WITH CHECK (
-        bucket_id = 'images' 
+        (bucket_id = 'images' OR bucket_id = 'media')
         AND auth.role() = 'authenticated'
     );
 
 CREATE POLICY "Modification authentifiée des images" ON storage.objects
     FOR UPDATE USING (
-        bucket_id = 'images' 
+        (bucket_id = 'images' OR bucket_id = 'media')
         AND auth.role() = 'authenticated'
     );
 
 CREATE POLICY "Suppression authentifiée des images" ON storage.objects
     FOR DELETE USING (
-        bucket_id = 'images' 
+        (bucket_id = 'images' OR bucket_id = 'media')
         AND auth.role() = 'authenticated'
     );

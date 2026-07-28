@@ -58,7 +58,8 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
             id: true,
             firstName: true,
             lastName: true,
-            email: true
+            email: true,
+            phone: true
           }
         }
       }
@@ -66,12 +67,41 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
 
     const recentEvents = await prisma.privateEvent.findMany({
       take: 6,
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        media: true,
+        gallery: true
+      }
     });
 
     const recentGallery = await prisma.gallery.findMany({
       take: 6,
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        event: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            type: true
+          }
+        }
+      }
+    });
+
+    const recentMedia = await prisma.media.findMany({
+      take: 6,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        event: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            type: true
+          }
+        }
+      }
     });
 
     return res.json({
@@ -86,7 +116,8 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
       recentActivity: {
         reservations: recentReservations,
         events: recentEvents,
-        gallery: recentGallery
+        gallery: recentGallery,
+        media: recentMedia
       }
     });
   } catch (error) {
@@ -109,22 +140,47 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<Re
               id: true,
               firstName: true,
               lastName: true,
-              email: true
+              email: true,
+              phone: true
             }
           }
         }
       }),
       prisma.privateEvent.findMany({
         take: Number(limit),
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: {
+          media: true,
+          gallery: true
+        }
       }),
       prisma.gallery.findMany({
         take: Number(limit),
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: {
+          event: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              type: true
+            }
+          }
+        }
       }),
       prisma.media.findMany({
         take: Number(limit),
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: {
+          event: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              type: true
+            }
+          }
+        }
       })
     ]);
 
@@ -147,6 +203,10 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<Re
 export const blockSlot = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { date, hour, reason } = req.body;
+
+    if (!date || hour === undefined) {
+      return res.status(400).json({ error: 'Date et heure requises' });
+    }
 
     const existing = await prisma.availability.findFirst({
       where: {
@@ -252,7 +312,7 @@ export const updatePricing = async (req: Request, res: Response): Promise<Respon
     await prisma.setting.upsert({
       where: { key: 'pricing' },
       update: { 
-        value: pricingData as any // Conversion explicite car Prisma accepte JsonValue
+        value: pricingData as any
       },
       create: { 
         key: 'pricing', 
@@ -279,7 +339,6 @@ export const getPricing = async (_req: Request, res: Response): Promise<Response
       where: { key: 'pricing' }
     });
 
-    // Vérifier et retourner les données
     if (pricing?.value && isPricingArray(pricing.value)) {
       return res.json(pricing.value);
     }
