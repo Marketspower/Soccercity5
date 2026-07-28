@@ -1,3 +1,4 @@
+// app/admin/notifications/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -27,7 +28,8 @@ export default function AdminNotifications() {
     sendNotification({ 
       title: title.trim(), 
       body: body.trim(), 
-      audience 
+      audience,
+      sentById: null // Ajouter sentById (peut être null)
     });
     setTitle(""); 
     setBody("");
@@ -96,7 +98,7 @@ export default function AdminNotifications() {
                   <p className="flex items-center gap-2 font-semibold">
                     <Bell className="size-4 text-primary" /> {n.title}
                   </p>
-                  <Badge variant="secondary">{AUDIENCES[n.audience]}</Badge>
+                  <Badge variant="secondary">{AUDIENCES[n.audience as keyof typeof AUDIENCES] || n.audience}</Badge>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">{n.body}</p>
                 <p className="mt-2 text-xs text-muted-foreground">

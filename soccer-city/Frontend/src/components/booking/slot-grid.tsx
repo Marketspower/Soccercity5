@@ -1,3 +1,4 @@
+// components/booking/slot-grid.tsx
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
@@ -20,8 +21,8 @@ export function SlotGrid({
 }) {
   const iso = toISODate(date);
   const { data: slots, isLoading } = useQuery({
-    queryKey: ["slots", fieldId, iso],
-    queryFn: () => fetchSlots(fieldId, date),
+    queryKey: ["slots", iso], // Supprimer fieldId de la clé
+    queryFn: () => fetchSlots(date), // Passer uniquement date
   });
 
   if (isLoading || !slots) {

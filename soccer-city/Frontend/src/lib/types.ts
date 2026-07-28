@@ -168,6 +168,17 @@ export interface Page {
   updated_at: string;
 }
 
+export interface Review {
+  id: string;
+  author: string;
+  role: string;
+  rating: number;
+  text: string;
+  avatar: string;
+  approved?: boolean;
+  createdAt?: string;
+}
+
 // ============================================
 // GALLERY & MEDIA SPECIFIC TYPES
 // ============================================

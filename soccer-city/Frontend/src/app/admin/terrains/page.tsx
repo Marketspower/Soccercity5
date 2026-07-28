@@ -1,3 +1,4 @@
+// app/admin/terrains/page.tsx
 "use client";
 
 import Image from "next/image";
@@ -17,17 +18,26 @@ import { formatCAD } from "@/lib/utils";
 import type { Field, TurfType } from "@/lib/types";
 
 const TURFS: TurfType[] = ["Gazon synthétique 5G", "Gazon synthétique hybride", "Gazon naturel"];
-const EMPTY: Omit<Field, "id"> = {
-  name: "", slug: "", image: "/fields/field-1.svg", dimensions: "40 × 20 m",
-  turf: "Gazon synthétique 5G", lighting: true, lockerRooms: 2, parking: true,
-  players: "5 vs 5", pricePerHour: 90, indoor: true, active: true,
+const EMPTY: Omit<Field, "id" | "created_at"> = {
+  name: "", 
+  slug: "", 
+  image: "", 
+  dimensions: "40 × 20 m",
+  turf: "Gazon synthétique 5G", 
+  lighting: true, 
+  lockerRooms: 2, 
+  parking: true,
+  players: "5 vs 5", 
+  pricePerHour: 90, 
+  indoor: true, 
+  active: true,
 };
 
 export default function AdminFields() {
-  const { fields, addField, updateField, removeField, uploadFieldImage, uploading } = useAppStore();
+  const { fields, addField, updateField, removeField, uploadImage, uploading } = useAppStore();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Omit<Field, "id">>(EMPTY);
+  const [draft, setDraft] = useState<Omit<Field, "id" | "created_at">>(EMPTY);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,7 +67,7 @@ export default function AdminFields() {
     reader.readAsDataURL(file);
 
     try {
-      const imageUrl = await uploadFieldImage(file);
+      const imageUrl = await uploadImage(file, 'fields');
       setDraft(prev => ({ ...prev, image: imageUrl }));
     } catch (error: any) {
       alert(error.message || 'Erreur lors de l\'upload de l\'image');
@@ -73,7 +83,7 @@ export default function AdminFields() {
 
   const removeImage = () => {
     setPreviewUrl(null);
-    setDraft(prev => ({ ...prev, image: "/fields/field-1.svg" }));
+    setDraft(prev => ({ ...prev, image: "" }));
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -106,7 +116,7 @@ export default function AdminFields() {
     setOpen(false);
   };
 
-  const setValue = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) =>
+  const setValue = <K extends keyof Omit<Field, "id" | "created_at">>(key: K, value: (typeof draft)[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
   return (
@@ -126,14 +136,20 @@ export default function AdminFields() {
       <div className="grid gap-6 md:grid-cols-2">
         {fields.map((f) => (
           <div key={f.id} className="group overflow-hidden rounded-xl border bg-card transition-all hover:shadow-glow-sm">
-            <div className="relative aspect-[16/9] overflow-hidden">
-              <Image 
-                src={f.image} 
-                alt={f.name} 
-                fill 
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
-                sizes="(max-width: 768px) 100vw, 50vw"
-              />
+            <div className="relative aspect-[16/9] overflow-hidden bg-muted">
+              {f.image ? (
+                <Image 
+                  src={f.image} 
+                  alt={f.name} 
+                  fill 
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <ImageIcon className="size-12 text-muted-foreground/30" />
+                </div>
+              )}
               {!f.active && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                   <Badge variant="destructive" className="text-lg">Désactivé</Badge>

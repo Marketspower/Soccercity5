@@ -1,3 +1,4 @@
+// app/admin/reservations/page.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -16,15 +17,13 @@ const STATUS_LABEL: Record<ReservationStatus, string> = {
 };
 
 export default function AdminReservations() {
-  const { reservations, fields, setReservationStatus } = useAppStore();
+  const { reservations, setReservationStatus } = useAppStore();
   const [filter, setFilter] = useState<"all" | ReservationStatus>("all");
 
   const rows = useMemo(
     () => reservations.filter((r) => filter === "all" || r.status === filter),
     [reservations, filter]
   );
-
-  const fieldName = (id: string) => fields.find((f) => f.id === id)?.name ?? id;
 
   return (
     <div className="space-y-6 p-6">
@@ -58,7 +57,7 @@ export default function AdminReservations() {
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="border-b bg-secondary/60 text-left">
-                {["Date", "Créneau", "Terrain", "Client", "Contact", "Montant", "Statut", "Actions"].map((h) => (
+                {["Date", "Créneau", "Client", "Contact", "Montant", "Statut", "Actions"].map((h) => (
                   <th key={h} className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     {h}
                   </th>
@@ -70,8 +69,7 @@ export default function AdminReservations() {
                 <tr key={r.id} className="border-b transition-colors last:border-0 hover:bg-accent/40">
                   <td className="px-4 py-3 tabular-nums">{r.date}</td>
                   <td className="px-4 py-3 tabular-nums">{slotLabel(r.hour)}</td>
-                  <td className="px-4 py-3 font-medium">{fieldName(r.fieldId)}</td>
-                  <td className="px-4 py-3">{r.userName}</td>
+                  <td className="px-4 py-3 font-medium">{r.userName}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {r.userEmail}<br />{r.userPhone}
                   </td>
