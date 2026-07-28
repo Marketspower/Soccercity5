@@ -36,7 +36,9 @@ export function Navbar() {
     <header
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-all duration-500",
-        scrolled ? "bg-black/80 backdrop-blur-xl border-b border-white/10" : "bg-transparent"
+        scrolled
+          ? "bg-black/80 backdrop-blur-xl border-b border-white/10"
+          : "bg-transparent"
       )}
     >
       <div className="container mx-auto flex h-16 items-center justify-between px-4 md:h-20">
@@ -80,21 +82,26 @@ export function Navbar() {
 
         <div className="flex items-center gap-2">
           {user && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={async () => {
-                const { supabase } = await import('@/lib/supabase');
+                const { supabase } = await import("@/lib/supabase");
                 await supabase.auth.signOut();
-                window.location.href = '/';
+                window.location.href = "/";
               }}
               className="hidden sm:inline-flex text-white/50 hover:text-white text-xs"
             >
               Déconnexion
             </Button>
           )}
-          <Button asChild variant="brand" size="sm" className="hidden sm:inline-flex">
-            <Link href="/reservation">
+          <Button
+            asChild
+            variant="brand"
+            size="sm"
+            className="hidden sm:inline-flex"
+          >
+            <Link href="/evenements">
               <CalendarCheck className="size-4" /> Réserver
             </Link>
           </Button>
@@ -143,9 +150,9 @@ export function Navbar() {
             {user && (
               <button
                 onClick={async () => {
-                  const { supabase } = await import('@/lib/supabase');
+                  const { supabase } = await import("@/lib/supabase");
                   await supabase.auth.signOut();
-                  window.location.href = '/';
+                  window.location.href = "/";
                 }}
                 className="py-3 text-white/40 hover:text-white/60 transition-colors text-left text-lg font-medium"
               >
@@ -153,8 +160,8 @@ export function Navbar() {
               </button>
             )}
             <Button asChild variant="brand" className="mt-2 w-full">
-              <Link href="/reservation" onClick={() => setOpen(false)}>
-                <CalendarCheck className="size-4" /> Réserver un terrain
+              <Link href="/evenements" onClick={() => setOpen(false)}>
+                <CalendarCheck className="size-4" /> Réserver
               </Link>
             </Button>
           </div>

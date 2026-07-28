@@ -1,3 +1,4 @@
+// lib/types.ts
 export type Role = "client" | "admin";
 
 export interface User {
@@ -8,6 +9,47 @@ export interface User {
   phone: string;
   role: Role;
   createdAt: string;
+}
+
+// ============================================
+// GALLERY - Gestion des images
+// ============================================
+export interface GalleryImage {
+  id: string;
+  imageUrl: string;
+  alt: string;
+  sortOrder: number;
+  eventId: string | null;
+  event?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    type: string;
+  } | null;
+  createdAt: string;
+}
+
+// ============================================
+// MEDIA - Gestion des vidéos et audios
+// ============================================
+export interface MediaItem {
+  id: string;
+  title: string;
+  url: string;
+  type: 'video' | 'photo' | 'audio';
+  thumbnail: string | null;
+  duration: string | null;
+  description: string | null;
+  isFeatured: boolean;
+  eventId: string | null;
+  event?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    type: string;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type TurfType = "Gazon synthétique 5G" | "Gazon synthétique hybride" | "Gazon naturel";
@@ -33,7 +75,7 @@ export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
 export interface Reservation {
   id: string;
-  fieldId: string;
+  userId: string | null;
   userName: string;
   userEmail: string;
   userPhone: string;
@@ -61,14 +103,16 @@ export interface PrivateEvent {
   message: string;
   status: EventStatus;
   createdAt: string;
+  media: MediaItem[];
+  gallery: GalleryImage[];
 }
 
 export interface BlockedSlot {
   id: string;
-  fieldId: string;
   date: string;
   hour: number;
-  reason: string;
+  blocked: boolean;
+  reason: string | null;
 }
 
 export interface PricingPlan {
@@ -78,15 +122,7 @@ export interface PricingPlan {
   unit: string;
   features: string[];
   highlighted: boolean;
-}
-
-export interface Review {
-  id: string;
-  author: string;
-  role: string;
-  rating: number;
-  text: string;
-  avatar: string;
+  sortOrder: number;
 }
 
 export interface AppNotification {
@@ -94,6 +130,7 @@ export interface AppNotification {
   title: string;
   body: string;
   audience: "all" | "clients" | "admins";
+  sentById: string | null;
   sentAt: string;
 }
 
@@ -105,7 +142,6 @@ export interface Slot {
   state: SlotState;
 }
 
-// Nouvelles interfaces pour les statistiques
 export interface Stat {
   id: string;
   key: string;
@@ -117,8 +153,55 @@ export interface Stat {
 
 export interface Rating {
   id: string;
-  user_id: string;
+  userId: string | null;
   rating: number;
-  comment: string;
+  comment: string | null;
   created_at: string;
+}
+
+export interface Page {
+  id: string;
+  slug: string;
+  title: string;
+  content: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
+// GALLERY & MEDIA SPECIFIC TYPES
+// ============================================
+
+export interface CreateGalleryImage {
+  imageUrl: string;
+  alt: string;
+  eventId?: string | null;
+}
+
+export interface UpdateGalleryImage {
+  alt?: string;
+  sortOrder?: number;
+  eventId?: string | null;
+}
+
+export interface CreateMediaItem {
+  title: string;
+  url: string;
+  type: 'video' | 'photo' | 'audio';
+  thumbnail?: string | null;
+  duration?: string | null;
+  description?: string | null;
+  isFeatured?: boolean;
+  eventId?: string | null;
+}
+
+export interface UpdateMediaItem {
+  title?: string;
+  url?: string;
+  type?: 'video' | 'photo' | 'audio';
+  thumbnail?: string | null;
+  duration?: string | null;
+  description?: string | null;
+  isFeatured?: boolean;
+  eventId?: string | null;
 }

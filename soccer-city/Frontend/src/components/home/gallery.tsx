@@ -1,3 +1,4 @@
+// components/home/gallery.tsx
 "use client";
 
 import Image from "next/image";
@@ -5,27 +6,19 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 import { Reveal } from "@/components/motion/reveal";
-
-const IMAGES = Array.from({ length: 8 }, (_, i) => ({
-  src: `/gallery/g${i + 1}.svg`,
-  alt: [
-    "Lignes de vitesse sur le terrain",
-    "Rond central sous les projecteurs",
-    "Éclairage LED du complexe",
-    "Filet de but en gros plan",
-    "Gazon synthétique 5G",
-    "Faisceaux des projecteurs de nuit",
-    "Ambiance de match",
-    "Halo bleu du stade",
-  ][i],
-}));
+import { useAppStore } from "@/lib/store";
 
 export function Gallery() {
+  const { gallery, loadGallery } = useAppStore();
   const [index, setIndex] = useState<number | null>(null);
 
+  useEffect(() => {
+    loadGallery();
+  }, []);
+
   const close = useCallback(() => setIndex(null), []);
-  const prev = useCallback(() => setIndex((i) => (i === null ? null : (i + IMAGES.length - 1) % IMAGES.length)), []);
-  const next = useCallback(() => setIndex((i) => (i === null ? null : (i + 1) % IMAGES.length)), []);
+  const prev = useCallback(() => setIndex((i) => (i === null ? null : (i + gallery.length - 1) % gallery.length)), [gallery.length]);
+  const next = useCallback(() => setIndex((i) => (i === null ? null : (i + 1) % gallery.length)), [gallery.length]);
 
   useEffect(() => {
     if (index === null) return;
@@ -42,17 +35,21 @@ export function Gallery() {
     };
   }, [index, close, prev, next]);
 
+  if (gallery.length === 0) return null;
+
   return (
     <section id="galerie" className="container py-24 md:py-32">
       <Reveal className="mb-14 max-w-2xl">
         <p className="speed-eyebrow mb-4">Galerie</p>
-        <h2 className="display text-4xl sm:text-5xl">L&apos;ambiance <span className="text-primary">Soccer City</span></h2>
+        <h2 className="display text-4xl sm:text-5xl">
+          L&apos;ambiance <span className="text-primary">Soccer City</span>
+        </h2>
       </Reveal>
 
       <div className="columns-2 gap-4 md:columns-3 lg:columns-4 [&>button]:mb-4">
-        {IMAGES.map((img, i) => (
+        {gallery.map((img, i) => (
           <motion.button
-            key={img.src}
+            key={img.id}
             type="button"
             onClick={() => setIndex(i)}
             initial={{ opacity: 0, y: 24 }}
@@ -62,14 +59,16 @@ export function Gallery() {
             className="group relative block w-full overflow-hidden rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label={`Agrandir : ${img.alt}`}
           >
-            <Image
-              src={img.src}
+            <img
+              src={img.imageUrl}
               alt={img.alt}
-              width={800}
-              height={700}
-              loading="lazy"
               className="w-full transition-transform duration-700 ease-out group-hover:scale-110"
             />
+            {img.event && (
+              <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 rounded text-xs text-white">
+                {img.event.type} - {img.event.firstName} {img.event.lastName}
+              </div>
+            )}
             <span className="absolute inset-0 flex items-center justify-center bg-primary/0 opacity-0 backdrop-blur-0 transition-all duration-300 group-hover:bg-primary/20 group-hover:opacity-100">
               <ZoomIn className="size-8 text-white drop-shadow" />
             </span>
@@ -97,15 +96,13 @@ export function Gallery() {
               className="relative max-h-[85vh] w-full max-w-4xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <Image
-                src={IMAGES[index].src}
-                alt={IMAGES[index].alt}
-                width={1200}
-                height={900}
+              <img
+                src={gallery[index].imageUrl}
+                alt={gallery[index].alt}
                 className="max-h-[85vh] w-full rounded-lg object-contain"
               />
               <p className="mt-3 text-center text-sm text-white/70">
-                {IMAGES[index].alt} — {index + 1} / {IMAGES.length}
+                {gallery[index].alt} — {index + 1} / {gallery.length}
               </p>
             </motion.div>
 

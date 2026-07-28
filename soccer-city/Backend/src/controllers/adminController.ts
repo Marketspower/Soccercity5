@@ -58,8 +58,12 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
             id: true,
             firstName: true,
             lastName: true,
+<<<<<<< HEAD
             email: true,
             phone: true
+=======
+            email: true
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
           }
         }
       }
@@ -67,15 +71,20 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
 
     const recentEvents = await prisma.privateEvent.findMany({
       take: 6,
+<<<<<<< HEAD
       orderBy: { createdAt: 'desc' },
       include: {
         media: true,
         gallery: true
       }
+=======
+      orderBy: { createdAt: 'desc' }
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
     });
 
     const recentGallery = await prisma.gallery.findMany({
       take: 6,
+<<<<<<< HEAD
       orderBy: { createdAt: 'desc' },
       include: {
         event: {
@@ -102,6 +111,9 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
           }
         }
       }
+=======
+      orderBy: { createdAt: 'desc' }
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
     });
 
     return res.json({
@@ -116,8 +128,12 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
       recentActivity: {
         reservations: recentReservations,
         events: recentEvents,
+<<<<<<< HEAD
         gallery: recentGallery,
         media: recentMedia
+=======
+        gallery: recentGallery
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
       }
     });
   } catch (error) {
@@ -140,14 +156,19 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<Re
               id: true,
               firstName: true,
               lastName: true,
+<<<<<<< HEAD
               email: true,
               phone: true
+=======
+              email: true
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
             }
           }
         }
       }),
       prisma.privateEvent.findMany({
         take: Number(limit),
+<<<<<<< HEAD
         orderBy: { createdAt: 'desc' },
         include: {
           media: true,
@@ -181,6 +202,17 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<Re
             }
           }
         }
+=======
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.gallery.findMany({
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.media.findMany({
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' }
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
       })
     ]);
 
@@ -204,10 +236,13 @@ export const blockSlot = async (req: Request, res: Response): Promise<Response> 
   try {
     const { date, hour, reason } = req.body;
 
+<<<<<<< HEAD
     if (!date || hour === undefined) {
       return res.status(400).json({ error: 'Date et heure requises' });
     }
 
+=======
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
     const existing = await prisma.availability.findFirst({
       where: {
         date,
@@ -312,7 +347,11 @@ export const updatePricing = async (req: Request, res: Response): Promise<Respon
     await prisma.setting.upsert({
       where: { key: 'pricing' },
       update: { 
+<<<<<<< HEAD
         value: pricingData as any
+=======
+        value: pricingData as any // Conversion explicite car Prisma accepte JsonValue
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
       },
       create: { 
         key: 'pricing', 
@@ -339,6 +378,10 @@ export const getPricing = async (_req: Request, res: Response): Promise<Response
       where: { key: 'pricing' }
     });
 
+<<<<<<< HEAD
+=======
+    // Vérifier et retourner les données
+>>>>>>> d95f53ccde598929c69288b964084f79ee7d4b15
     if (pricing?.value && isPricingArray(pricing.value)) {
       return res.json(pricing.value);
     }

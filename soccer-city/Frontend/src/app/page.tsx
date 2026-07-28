@@ -1,3 +1,4 @@
+// app/page.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -11,41 +12,18 @@ import { Reviews } from "@/components/home/reviews";
 import { Faq } from "@/components/home/faq";
 import { Contact } from "@/components/home/contact";
 import { CtaBanner } from "@/components/home/cta";
+import { MediaSection } from "@/components/home/media-section";
 import { useAppStore } from "@/lib/store";
 
-/**
- * Page d'accueil — parcours de conversion :
- * Hero (CTA) → Preuves (valeurs, terrains) → Offre (tarifs, services)
- * → Réassurance (avis, galerie, FAQ) → Contact → CTA final.
- * 
- * Interaction en temps réel avec le backend via Supabase Realtime
- */
 export default function HomePage() {
-  const { 
-    loadInitialData, 
-    isInitialized, 
-    isLoading,
-    fields,
-    reservations,
-    events 
-  } = useAppStore();
+  const { loadInitialData, isInitialized, isLoading } = useAppStore();
 
-  // Charger les données au premier rendu
   useEffect(() => {
     if (!isInitialized) {
       loadInitialData();
     }
   }, [isInitialized, loadInitialData]);
 
-  // Écouter les mises à jour en temps réel
-  useEffect(() => {
-    if (isInitialized) {
-      console.log('🏟️ Soccer City - Prêt en temps réel');
-      console.log(`📊 ${fields.length} terrains, ${reservations.length} réservations, ${events.length} événements`);
-    }
-  }, [isInitialized, fields, reservations, events]);
-
-  // Afficher un loader pendant le chargement
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-950 via-black to-blue-950">
@@ -68,6 +46,7 @@ export default function HomePage() {
       <Pricing />
       <Services />
       <Gallery />
+      <MediaSection />
       <Reviews />
       <Faq />
       <Contact />

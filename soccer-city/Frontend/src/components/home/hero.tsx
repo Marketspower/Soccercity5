@@ -4,19 +4,21 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRef, useEffect } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { CalendarCheck, PartyPopper, ChevronDown, Zap } from "lucide-react";
+import { PartyPopper, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter } from "@/components/motion/counter";
 import { useAppStore } from "@/lib/store";
 
 export function Hero() {
   const ref = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end start"],
+  });
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "24%"]);
   const fade = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
-  
-  const { fields, stats, loadStats } = useAppStore();
-  const activeFields = fields.filter(f => f.active).length;
+
+  const { stats, loadStats } = useAppStore();
 
   useEffect(() => {
     loadStats();
@@ -24,21 +26,31 @@ export function Hero() {
 
   // Récupérer les valeurs des statistiques
   const getStatValue = (key: string) => {
-    const stat = stats.find(s => s.key === key);
+    const stat = stats.find((s) => s.key === key);
     return stat ? stat.value : 0;
   };
 
   const getStatSuffix = (key: string) => {
-    const stat = stats.find(s => s.key === key);
-    return stat ? stat.suffix : '';
+    const stat = stats.find((s) => s.key === key);
+    return stat ? stat.suffix : "";
   };
 
   return (
-    <section ref={ref} className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#050607]">
-      <motion.div style={{ y: bgY }} className="absolute inset-0 gpu" aria-hidden>
+    <section
+      ref={ref}
+      className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#050607]"
+    >
+      <motion.div
+        style={{ y: bgY }}
+        className="absolute inset-0 gpu"
+        aria-hidden
+      >
         <video
           className="absolute inset-0 h-full w-full object-cover opacity-40"
-          autoPlay muted loop playsInline
+          autoPlay
+          muted
+          loop
+          playsInline
           poster="/fields/field-3.svg"
         >
           <source src="/hero.mp4" type="video/mp4" />
@@ -63,13 +75,22 @@ export function Hero() {
           animate={{ x: [0, 14, 0] }}
           transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Image src="/logo.png" alt="" width={560} height={400} className="w-full" />
+          <Image
+            src="/logo.png"
+            alt=""
+            width={560}
+            height={400}
+            className="w-full"
+          />
         </motion.div>
 
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
       </motion.div>
 
-      <motion.div style={{ opacity: fade }} className="container relative z-10 flex flex-1 flex-col justify-center pt-28 pb-16">
+      <motion.div
+        style={{ opacity: fade }}
+        className="container relative z-10 flex flex-1 flex-col justify-center pt-28 pb-16"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -100,18 +121,24 @@ export function Hero() {
         </motion.p>
 
         <h1 className="display max-w-4xl text-5xl leading-[0.95] text-white sm:text-7xl lg:text-8xl">
-          {["Réservez", "votre terrain", "en 60 secondes"].map((line, i) => (
-            <span key={line} className="block overflow-hidden">
-              <motion.span
-                className="block"
-                initial={{ y: "110%" }}
-                animate={{ y: 0 }}
-                transition={{ duration: 0.9, delay: 0.25 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-              >
-                {i === 1 ? <span className="text-shine">{line}</span> : line}
-              </motion.span>
-            </span>
-          ))}
+          {["Organisez", "tous vos événements", "en toute simplicité"].map(
+            (line, i) => (
+              <span key={line} className="block overflow-hidden">
+                <motion.span
+                  className="block"
+                  initial={{ y: "110%" }}
+                  animate={{ y: 0 }}
+                  transition={{
+                    duration: 0.9,
+                    delay: 0.25 + i * 0.12,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                >
+                  {i === 1 ? <span className="text-shine">{line}</span> : line}
+                </motion.span>
+              </span>
+            )
+          )}
         </h1>
 
         <motion.p
@@ -120,7 +147,9 @@ export function Hero() {
           transition={{ duration: 0.8, delay: 0.75 }}
           className="mt-6 max-w-xl text-base text-white/70 sm:text-lg"
         >
-          {activeFields} terrains d&apos;exception, éclairage LED, réservation instantanée.
+          Des terrains d&apos;exception pour vos anniversaires, tournois,
+          activités d&apos;entreprise, sorties scolaires, compétitions, matchs
+          privés et célébrations, avec éclairage LED et réservation simplifiée.
         </motion.p>
 
         <motion.div
@@ -129,17 +158,15 @@ export function Hero() {
           transition={{ duration: 0.8, delay: 0.9 }}
           className="mt-10 flex flex-col gap-4 sm:flex-row"
         >
-          <Button asChild variant="brand" size="lg" className="animate-pulse-glow group">
-            <Link href="/reservation" className="flex items-center gap-2">
-              <CalendarCheck className="size-5" />
-              Réserver un terrain
-              <Zap className="size-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </Link>
-          </Button>
-          <Button asChild variant="glass" size="lg" className="text-white hover:text-white/90 group">
+          <Button
+            asChild
+            variant="brand"
+            size="lg"
+            className="animate-pulse-glow group"
+          >
             <Link href="/evenements" className="flex items-center gap-2">
               <PartyPopper className="size-5" />
-              Organiser un événement
+              Choisir un événement
             </Link>
           </Button>
         </motion.div>
@@ -154,30 +181,47 @@ export function Hero() {
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Terrains</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={getStatValue('terrains')} />
+              <Counter value={getStatValue("terrains")} />
             </dd>
-            <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">Terrains</p>
+            <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">
+              Terrains
+            </p>
           </div>
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Matchs</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={getStatValue('matchs_joues')} suffix={getStatSuffix('matchs_joues')} />
+              <Counter
+                value={getStatValue("matchs_joues")}
+                suffix={getStatSuffix("matchs_joues")}
+              />
             </dd>
-            <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">Matchs joués</p>
+            <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">
+              Matchs joués
+            </p>
           </div>
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Satisfaction</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={getStatValue('satisfaction')} suffix={getStatSuffix('satisfaction')} />
+              <Counter
+                value={getStatValue("satisfaction")}
+                suffix={getStatSuffix("satisfaction")}
+              />
             </dd>
-            <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">Satisfaction</p>
+            <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">
+              Satisfaction
+            </p>
           </div>
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Expérience</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={getStatValue('annees_experience')} suffix={getStatSuffix('annees_experience')} />
+              <Counter
+                value={getStatValue("annees_experience")}
+                suffix={getStatSuffix("annees_experience")}
+              />
             </dd>
-            <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">Années</p>
+            <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">
+              Années
+            </p>
           </div>
         </motion.dl>
 
@@ -192,7 +236,8 @@ export function Hero() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pitch opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-pitch" />
           </span>
-          Disponibilités en temps réel · {new Date().toLocaleTimeString('fr-CA')}
+          Disponibilités en temps réel ·{" "}
+          {new Date().toLocaleTimeString("fr-CA")}
         </motion.div>
       </motion.div>
 

@@ -1,6 +1,7 @@
+// components/home/fields.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { CalendarSearch, CircleParking, DoorOpen, Lightbulb, Ruler, Sprout, Users, Zap } from "lucide-react";
@@ -23,17 +24,31 @@ function Spec({ Icon, label }: { Icon: React.ElementType; label: string }) {
 
 // Carte d'un terrain
 function FieldCard({ field }: { field: Field }) {
+  // Utiliser l'image du terrain depuis la base de données
+  const imageUrl = field.image || '';
+
   return (
     <article className="card-hover group overflow-hidden rounded-xl border bg-card transition-all hover:shadow-glow-sm">
-      <div className="relative aspect-[16/10] overflow-hidden">
-        <Image
-          src={field.image || '/fields/field-1.svg'}
-          alt={`${field.name} — ${field.players}`}
-          fill
-          loading="lazy"
-          sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-cover transition-transform duration-700 group-hover:scale-105"
-        />
+      <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={`${field.name} — ${field.players}`}
+            fill
+            loading="lazy"
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
+            onError={(e) => {
+              // Si l'image ne charge pas, afficher un fallback
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-primary/5">
+            <span className="text-6xl">⚽</span>
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         <div className="absolute left-4 top-4 flex gap-2">
           <Badge>{field.players}</Badge>
@@ -76,7 +91,9 @@ function FieldCard({ field }: { field: Field }) {
 
 // Composant principal Fields
 export function Fields() {
-  const { fields, loadFields, isLoading } = useAppStore();
+  const { fields, loadFields, isLoading, gallery } = useAppStore();
+  const [fieldsWithImages, setFieldsWithImages] = useState<Field[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     console.log('🔄 Chargement des terrains...');
@@ -84,13 +101,43 @@ export function Fields() {
   }, []);
 
   useEffect(() => {
+    // Associer les images de la galerie aux terrains
+    if (fields.length > 0) {
+      const updatedFields = fields.map(field => {
+        // Si le terrain a une image, l'utiliser
+        if (field.image) {
+          return field;
+        }
+        
+        // Sinon, chercher dans la galerie une image associée à ce terrain
+        const galleryImage = gallery.find(g => 
+          g.alt?.toLowerCase().includes(field.name.toLowerCase()) ||
+          g.eventId === field.id
+        );
+        
+        if (galleryImage) {
+          return { ...field, image: galleryImage.imageUrl };
+        }
+        
+        return field;
+      });
+      setFieldsWithImages(updatedFields);
+      setLoading(false);
+    } else {
+      setFieldsWithImages([]);
+      setLoading(false);
+    }
+  }, [fields, gallery]);
+
+  useEffect(() => {
     console.log('📊 Terrains dans le store:', fields);
-  }, [fields]);
+    console.log('📸 Images dans la galerie:', gallery);
+  }, [fields, gallery]);
 
   // Filtrer les terrains actifs
-  const activeFields = fields.filter(f => f.active);
+  const activeFields = fieldsWithImages.filter(f => f.active);
 
-  if (isLoading) {
+  if (isLoading || loading) {
     return (
       <section className="container py-16">
         <div className="text-center">
