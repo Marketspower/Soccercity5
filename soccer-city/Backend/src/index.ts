@@ -1,3 +1,4 @@
+// backend/src/index.ts
 import app from './app';
 import { createServer } from 'http';
 import { initWebSocket, setupRealtimeChannels, checkSupabaseConnection } from './services/realtimeService';

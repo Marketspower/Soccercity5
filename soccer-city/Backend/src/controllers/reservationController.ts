@@ -1,26 +1,26 @@
+// backend/src/controllers/reservationController.ts
 import { Request, Response } from 'express';
 import { prisma } from '../services/prismaService';
 import { supabase } from '../services/realtimeService';
 
 export const getReservations = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { status, date, fieldId } = req.query;
+    const { status, date } = req.query;
 
     const where: any = {};
     if (status) where.status = status;
     if (date) where.date = date;
-    if (fieldId) where.fieldId = fieldId;
 
     const reservations = await prisma.reservation.findMany({
       where,
       include: {
-        field: true,
         user: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
-            email: true
+            email: true,
+            phone: true
           }
         }
       },
@@ -39,7 +39,17 @@ export const getReservation = async (req: Request, res: Response): Promise<Respo
     const { id } = req.params;
     const reservation = await prisma.reservation.findUnique({
       where: { id },
-      include: { field: true }
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
     });
 
     if (!reservation) {
@@ -55,12 +65,18 @@ export const getReservation = async (req: Request, res: Response): Promise<Respo
 
 export const createReservation = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { fieldId, date, hour, price, userName, userEmail, userPhone } = req.body;
+    const { date, hour, price, userName, userEmail, userPhone, userId } = req.body;
 
-    // Vérifier si le créneau est disponible
+    // Validation des champs requis
+    if (!date || hour === undefined || !price || !userName || !userEmail || !userPhone) {
+      return res.status(400).json({ 
+        error: 'Tous les champs sont requis: date, hour, price, userName, userEmail, userPhone' 
+      });
+    }
+
+    // Vérifier si le créneau est disponible (basé sur date + hour uniquement)
     const existing = await prisma.reservation.findFirst({
       where: {
-        fieldId,
         date,
         hour,
         status: { in: ['confirmed', 'pending'] }
@@ -71,33 +87,29 @@ export const createReservation = async (req: Request, res: Response): Promise<Re
       return res.status(409).json({ error: 'Ce créneau est déjà réservé' });
     }
 
-    // Vérifier les blocages administratifs
-    const blocked = await prisma.availability.findFirst({
-      where: {
-        fieldId,
-        date,
-        hour,
-        blocked: true
-      }
-    });
-
-    if (blocked) {
-      return res.status(409).json({ error: 'Ce créneau est bloqué par l\'administration' });
-    }
-
     // Créer la réservation
     const reservation = await prisma.reservation.create({
       data: {
-        fieldId,
         date,
         hour,
         price,
         userName,
         userEmail,
         userPhone,
+        userId: userId || null,
         status: 'confirmed'
       },
-      include: { field: true }
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
     });
 
     // Broadcast en temps réel
@@ -110,7 +122,10 @@ export const createReservation = async (req: Request, res: Response): Promise<Re
     return res.status(201).json(reservation);
   } catch (error) {
     console.error('Erreur createReservation:', error);
-    return res.status(500).json({ error: 'Erreur lors de la création de la réservation' });
+    return res.status(500).json({ 
+      error: 'Erreur lors de la création de la réservation',
+      details: error instanceof Error ? error.message : 'Erreur inconnue'
+    });
   }
 };
 
@@ -119,10 +134,24 @@ export const updateReservationStatus = async (req: Request, res: Response): Prom
     const { id } = req.params;
     const { status } = req.body;
 
+    if (!status) {
+      return res.status(400).json({ error: 'Le statut est requis' });
+    }
+
     const reservation = await prisma.reservation.update({
       where: { id },
       data: { status },
-      include: { field: true }
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
     });
 
     // Broadcast en temps réel
@@ -157,15 +186,19 @@ export const deleteReservation = async (req: Request, res: Response): Promise<Re
 export const getReservationsByDate = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { date } = req.params;
-    const { fieldId } = req.query;
-
-    const where: any = { date };
-    if (fieldId) where.fieldId = fieldId;
 
     const reservations = await prisma.reservation.findMany({
-      where,
+      where: { date },
       include: {
-        field: true
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        }
       },
       orderBy: { hour: 'asc' }
     });
@@ -174,5 +207,51 @@ export const getReservationsByDate = async (req: Request, res: Response): Promis
   } catch (error) {
     console.error('Erreur getReservationsByDate:', error);
     return res.status(500).json({ error: 'Erreur lors de la récupération des réservations' });
+  }
+};
+
+export const getAvailableSlots = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { date } = req.params;
+
+    // Récupérer toutes les réservations pour la date
+    const reservations = await prisma.reservation.findMany({
+      where: { 
+        date,
+        status: { in: ['confirmed', 'pending'] }
+      },
+      select: { hour: true }
+    });
+
+    // Récupérer les créneaux bloqués
+    const blockedSlots = await prisma.availability.findMany({
+      where: { 
+        date,
+        blocked: true
+      },
+      select: { hour: true }
+    });
+
+    // Créer un Set des heures réservées
+    const bookedHours = new Set(reservations.map(r => r.hour));
+    const blockedHours = new Set(blockedSlots.map(b => b.hour));
+
+    // Générer les heures disponibles (8h à 22h)
+    const availableSlots = [];
+    for (let hour = 8; hour <= 22; hour++) {
+      if (!bookedHours.has(hour) && !blockedHours.has(hour)) {
+        availableSlots.push(hour);
+      }
+    }
+
+    return res.json({
+      date,
+      availableSlots,
+      bookedSlots: Array.from(bookedHours).sort(),
+      blockedSlots: Array.from(blockedHours).sort()
+    });
+  } catch (error) {
+    console.error('Erreur getAvailableSlots:', error);
+    return res.status(500).json({ error: 'Erreur lors de la récupération des créneaux disponibles' });
   }
 };

@@ -7,6 +7,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    // ✅ CORRECTION ICI : "node" au lieu de "node10"
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "removeComments": true,
@@ -22,6 +23,7 @@
     "esModuleInterop": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    // ✅ AJOUT : Ignorer le warning de dépréciation
     "ignoreDeprecations": "6.0"
   },
   "exclude": ["node_modules", "dist"],

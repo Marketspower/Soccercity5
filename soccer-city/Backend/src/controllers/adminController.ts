@@ -1,14 +1,48 @@
+// backend/src/controllers/adminController.ts
 import { Request, Response } from 'express';
 import { prisma } from '../services/prismaService';
 import { supabase } from '../services/realtimeService';
 
+// Interface pour les éléments de pricing
+interface PricingItem {
+  id: string;
+  name: string;
+  price: number;
+  unit: string;
+  features: string[];
+  highlighted: boolean;
+}
+
+// Type guard pour vérifier si une valeur est un tableau de PricingItem
+function isPricingArray(value: unknown): value is PricingItem[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((item) => 
+    typeof item === 'object' &&
+    item !== null &&
+    'id' in item &&
+    'name' in item &&
+    'price' in item &&
+    'unit' in item &&
+    'features' in item &&
+    'highlighted' in item
+  );
+}
+
 export const getDashboardStats = async (_req: Request, res: Response): Promise<Response> => {
   try {
-    const [totalReservations, confirmedReservations, pendingEvents, activeFields, totalRevenue] = await Promise.all([
+    const [
+      totalReservations, 
+      confirmedReservations, 
+      pendingEvents, 
+      totalGalleryImages,
+      totalMedia,
+      totalRevenue
+    ] = await Promise.all([
       prisma.reservation.count(),
       prisma.reservation.count({ where: { status: 'confirmed' } }),
       prisma.privateEvent.count({ where: { status: 'new' } }),
-      prisma.field.count({ where: { active: true } }),
+      prisma.gallery.count(),
+      prisma.media.count(),
       prisma.reservation.aggregate({
         where: { status: 'confirmed' },
         _sum: { price: true }
@@ -18,7 +52,56 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
     const recentReservations = await prisma.reservation.findMany({
       take: 6,
       orderBy: { createdAt: 'desc' },
-      include: { field: true }
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
+    });
+
+    const recentEvents = await prisma.privateEvent.findMany({
+      take: 6,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        media: true,
+        gallery: true
+      }
+    });
+
+    const recentGallery = await prisma.gallery.findMany({
+      take: 6,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        event: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            type: true
+          }
+        }
+      }
+    });
+
+    const recentMedia = await prisma.media.findMany({
+      take: 6,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        event: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            type: true
+          }
+        }
+      }
     });
 
     return res.json({
@@ -26,10 +109,16 @@ export const getDashboardStats = async (_req: Request, res: Response): Promise<R
         totalReservations,
         confirmedReservations,
         pendingEvents,
-        activeFields,
+        totalGalleryImages,
+        totalMedia,
         totalRevenue: totalRevenue._sum.price || 0
       },
-      recentActivity: recentReservations
+      recentActivity: {
+        reservations: recentReservations,
+        events: recentEvents,
+        gallery: recentGallery,
+        media: recentMedia
+      }
     });
   } catch (error) {
     console.error('Erreur getDashboardStats:', error);
@@ -41,21 +130,68 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<Re
   try {
     const { limit = 10 } = req.query;
 
-    const [reservations, events] = await Promise.all([
+    const [reservations, events, gallery, media] = await Promise.all([
       prisma.reservation.findMany({
         take: Number(limit),
         orderBy: { createdAt: 'desc' },
-        include: { field: true }
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true
+            }
+          }
+        }
       }),
       prisma.privateEvent.findMany({
         take: Number(limit),
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: {
+          media: true,
+          gallery: true
+        }
+      }),
+      prisma.gallery.findMany({
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          event: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              type: true
+            }
+          }
+        }
+      }),
+      prisma.media.findMany({
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          event: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              type: true
+            }
+          }
+        }
       })
     ]);
 
-    const activity = [...reservations, ...events]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, Number(limit));
+    const activity = [
+      ...reservations.map(r => ({ ...r, type: 'reservation' })),
+      ...events.map(e => ({ ...e, type: 'event' })),
+      ...gallery.map(g => ({ ...g, type: 'gallery' })),
+      ...media.map(m => ({ ...m, type: 'media' }))
+    ]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, Number(limit));
 
     return res.json(activity);
   } catch (error) {
@@ -66,11 +202,26 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<Re
 
 export const blockSlot = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { fieldId, date, hour, reason } = req.body;
+    const { date, hour, reason } = req.body;
+
+    if (!date || hour === undefined) {
+      return res.status(400).json({ error: 'Date et heure requises' });
+    }
+
+    const existing = await prisma.availability.findFirst({
+      where: {
+        date,
+        hour,
+        blocked: true
+      }
+    });
+
+    if (existing) {
+      return res.status(409).json({ error: 'Ce créneau est déjà bloqué' });
+    }
 
     const block = await prisma.availability.create({
       data: {
-        fieldId,
         date,
         hour,
         blocked: true,
@@ -78,7 +229,6 @@ export const blockSlot = async (req: Request, res: Response): Promise<Response> 
       }
     });
 
-    // Broadcast en temps réel
     await supabase.channel('availability-changes').send({
       type: 'broadcast',
       event: 'new_block',
@@ -109,18 +259,94 @@ export const unblockSlot = async (req: Request, res: Response): Promise<Response
 
 export const updatePricing = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { fieldId } = req.params;
-    const { pricePerHour } = req.body;
+    const { id } = req.params;
+    const { price, name, unit, features, highlighted } = req.body;
 
-    const field = await prisma.field.update({
-      where: { id: fieldId },
-      data: { pricePerHour: parseFloat(pricePerHour) }
+    // Récupérer le pricing existant
+    const pricingSetting = await prisma.setting.findUnique({
+      where: { key: 'pricing' }
     });
 
-    return res.json(field);
+    // Initialiser le tableau de pricing
+    let pricingData: PricingItem[] = [];
+
+    // Si des données existent, les parser avec validation
+    if (pricingSetting?.value) {
+      const value = pricingSetting.value;
+      if (isPricingArray(value)) {
+        pricingData = value;
+      }
+    }
+
+    // Si c'est une mise à jour d'un élément existant
+    if (id) {
+      const index = pricingData.findIndex(item => item.id === id);
+      if (index !== -1) {
+        pricingData[index] = {
+          ...pricingData[index],
+          name: name || pricingData[index].name,
+          price: price !== undefined ? Number(price) : pricingData[index].price,
+          unit: unit || pricingData[index].unit,
+          features: features || pricingData[index].features,
+          highlighted: highlighted !== undefined ? highlighted : pricingData[index].highlighted
+        };
+      } else {
+        return res.status(404).json({ error: 'Élément de tarif non trouvé' });
+      }
+    } else {
+      // Création d'un nouvel élément
+      if (!name || price === undefined) {
+        return res.status(400).json({ error: 'Nom et prix requis' });
+      }
+      pricingData.push({
+        id: Date.now().toString(),
+        name,
+        price: Number(price),
+        unit: unit || '/ heure',
+        features: features || [],
+        highlighted: highlighted || false
+      });
+    }
+
+    // Sauvegarder dans la base de données
+    await prisma.setting.upsert({
+      where: { key: 'pricing' },
+      update: { 
+        value: pricingData as any
+      },
+      create: { 
+        key: 'pricing', 
+        value: pricingData as any 
+      }
+    });
+
+    return res.json({ 
+      message: 'Tarifs mis à jour avec succès', 
+      data: pricingData 
+    });
   } catch (error) {
     console.error('Erreur updatePricing:', error);
-    return res.status(500).json({ error: 'Erreur lors de la mise à jour du tarif' });
+    return res.status(500).json({ 
+      error: 'Erreur lors de la mise à jour des tarifs',
+      details: error instanceof Error ? error.message : 'Erreur inconnue'
+    });
+  }
+};
+
+export const getPricing = async (_req: Request, res: Response): Promise<Response> => {
+  try {
+    const pricing = await prisma.setting.findUnique({
+      where: { key: 'pricing' }
+    });
+
+    if (pricing?.value && isPricingArray(pricing.value)) {
+      return res.json(pricing.value);
+    }
+    
+    return res.json([]);
+  } catch (error) {
+    console.error('Erreur getPricing:', error);
+    return res.status(500).json({ error: 'Erreur lors de la récupération des tarifs' });
   }
 };
 
@@ -134,7 +360,12 @@ export const getUsers = async (_req: Request, res: Response): Promise<Response> 
         email: true,
         phone: true,
         role: true,
-        createdAt: true
+        createdAt: true,
+        _count: {
+          select: {
+            reservations: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -151,16 +382,19 @@ export const sendNotification = async (req: Request, res: Response): Promise<Res
     const { title, body, audience } = req.body;
     const userId = (req as any).user?.id;
 
+    if (!title || !body) {
+      return res.status(400).json({ error: 'Titre et message requis' });
+    }
+
     const notification = await prisma.notification.create({
       data: {
         title,
         body,
-        audience,
+        audience: audience || 'all',
         sentById: userId
       }
     });
 
-    // Broadcast en temps réel
     await supabase.channel('notifications').send({
       type: 'broadcast',
       event: 'new_notification',
@@ -171,5 +405,46 @@ export const sendNotification = async (req: Request, res: Response): Promise<Res
   } catch (error) {
     console.error('Erreur sendNotification:', error);
     return res.status(500).json({ error: 'Erreur lors de l\'envoi de la notification' });
+  }
+};
+
+export const getGalleryStats = async (_req: Request, res: Response): Promise<Response> => {
+  try {
+    const [totalImages, totalMedia, imagesByEvent] = await Promise.all([
+      prisma.gallery.count(),
+      prisma.media.count(),
+      prisma.gallery.groupBy({
+        by: ['eventId'],
+        _count: true
+      })
+    ]);
+
+    return res.json({
+      totalImages,
+      totalMedia,
+      imagesByEvent
+    });
+  } catch (error) {
+    console.error('Erreur getGalleryStats:', error);
+    return res.status(500).json({ error: 'Erreur lors de la récupération des statistiques de la galerie' });
+  }
+};
+
+export const getEventAnalytics = async (_req: Request, res: Response): Promise<Response> => {
+  try {
+    const events = await prisma.privateEvent.groupBy({
+      by: ['type', 'status'],
+      _count: true
+    });
+
+    const totalEvents = await prisma.privateEvent.count();
+
+    return res.json({
+      totalEvents,
+      analytics: events
+    });
+  } catch (error) {
+    console.error('Erreur getEventAnalytics:', error);
+    return res.status(500).json({ error: 'Erreur lors de la récupération des analytics' });
   }
 };
