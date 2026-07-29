@@ -1,20 +1,33 @@
 // lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 
-// Valeurs par défaut pour éviter les erreurs de build
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+// Valeurs par défaut pour le build (évite les erreurs)
+const DEFAULT_SUPABASE_URL = 'https://placeholder.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'placeholder-key';
 
-// Vérification des variables d'environnement
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-  console.warn('⚠️ Variables Supabase manquantes. Utilisation de valeurs par défaut.');
-}
+// Récupérer les variables d'environnement
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
-// Fonction pour vérifier si Supabase est configuré
+// Vérifier si Supabase est configuré pour de vrai
 export const isSupabaseConfigured = () => {
-  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && 
+           process.env.NEXT_PUBLIC_SUPABASE_URL !== DEFAULT_SUPABASE_URL &&
+           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && 
+           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== DEFAULT_SUPABASE_ANON_KEY);
 };
 
+// Logger l'état au démarrage
+if (typeof window !== 'undefined') {
+  console.log('🔧 Supabase configuré:', isSupabaseConfigured());
+  if (isSupabaseConfigured()) {
+    console.log('✅ Connexion à Supabase:', supabaseUrl);
+  } else {
+    console.warn('⚠️ Supabase non configuré - Mode dégradé');
+  }
+}
+
+// Créer le client Supabase
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
@@ -29,12 +42,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Fonction pour vérifier la connexion
 export const checkSupabaseConnection = async () => {
+  if (!isSupabaseConfigured()) {
+    console.warn('⚠️ Supabase non configuré');
+    return false;
+  }
+  
   try {
-    if (!isSupabaseConfigured()) {
-      console.warn('⚠️ Supabase non configuré');
-      return false;
-    }
-    const { data, error } = await supabase.from('fields').select('count', { count: 'exact', head: true });
+    const { data, error } = await supabase
+      .from('fields')
+      .select('count', { count: 'exact', head: true });
+    
     if (error) throw error;
     console.log('✅ Connexion Supabase établie');
     return true;
@@ -46,10 +63,11 @@ export const checkSupabaseConnection = async () => {
 
 // Fonction pour obtenir l'utilisateur actuel
 export const getCurrentUser = async () => {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+  
   try {
-    if (!isSupabaseConfigured()) {
-      return null;
-    }
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw error;
     return user;
@@ -61,10 +79,11 @@ export const getCurrentUser = async () => {
 
 // Fonction pour vérifier si l'utilisateur est admin
 export const isUserAdmin = async () => {
+  if (!isSupabaseConfigured()) {
+    return false;
+  }
+  
   try {
-    if (!isSupabaseConfigured()) {
-      return false;
-    }
     const user = await getCurrentUser();
     if (!user) return false;
     
@@ -84,14 +103,35 @@ export const isUserAdmin = async () => {
 
 // Fonction pour se déconnecter
 export const signOut = async () => {
+  if (!isSupabaseConfigured()) {
+    return false;
+  }
+  
   try {
-    if (!isSupabaseConfigured()) {
-      return false;
-    }
     await supabase.auth.signOut();
     return true;
   } catch (error) {
     console.error('❌ Erreur déconnexion:', error);
     return false;
+  }
+};
+
+// Fonction utilitaire pour les requêtes avec fallback
+export const safeSupabaseQuery = async <T>(
+  queryFn: () => Promise<{ data: T | null; error: any }>,
+  fallbackData: T
+): Promise<T> => {
+  if (!isSupabaseConfigured()) {
+    console.warn('⚠️ Supabase non configuré - Utilisation des données de fallback');
+    return fallbackData;
+  }
+  
+  try {
+    const { data, error } = await queryFn();
+    if (error) throw error;
+    return data || fallbackData;
+  } catch (error) {
+    console.error('❌ Erreur requête Supabase:', error);
+    return fallbackData;
   }
 };
