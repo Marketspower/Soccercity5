@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "@/lib/store";
+import type { AppNotification } from "@/lib/types";
 
 const AUDIENCES = { 
   all: "Tout le monde", 
@@ -17,20 +18,26 @@ const AUDIENCES = {
   admins: "Équipe" 
 } as const;
 
+type AudienceType = keyof typeof AUDIENCES;
+
 export default function AdminNotifications() {
   const { notifications, sendNotification } = useAppStore();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [audience, setAudience] = useState<keyof typeof AUDIENCES>("all");
+  const [audience, setAudience] = useState<AudienceType>("all");
 
   const send = () => {
     if (!title.trim() || !body.trim()) return;
-    sendNotification({ 
-      title: title.trim(), 
-      body: body.trim(), 
-      audience,
-      sentById: null // Ajouter sentById (peut être null)
-    });
+    
+    // Créer l'objet avec toutes les propriétés requises
+    const notificationData = {
+      title: title.trim(),
+      body: body.trim(),
+      audience: audience,
+      sentById: null as string | null
+    };
+    
+    sendNotification(notificationData);
     setTitle(""); 
     setBody("");
   };
@@ -66,7 +73,7 @@ export default function AdminNotifications() {
             <Select 
               id="n-aud" 
               value={audience} 
-              onChange={(e) => setAudience(e.target.value as keyof typeof AUDIENCES)}
+              onChange={(e) => setAudience(e.target.value as AudienceType)}
             >
               {Object.entries(AUDIENCES).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
@@ -79,7 +86,7 @@ export default function AdminNotifications() {
             onClick={send} 
             disabled={!title.trim() || !body.trim()}
           >
-            <Send /> Envoyer la notification
+            <Send className="mr-2 size-4" /> Envoyer la notification
           </Button>
         </div>
       </section>
@@ -98,7 +105,9 @@ export default function AdminNotifications() {
                   <p className="flex items-center gap-2 font-semibold">
                     <Bell className="size-4 text-primary" /> {n.title}
                   </p>
-                  <Badge variant="secondary">{AUDIENCES[n.audience as keyof typeof AUDIENCES] || n.audience}</Badge>
+                  <Badge variant="secondary">
+                    {AUDIENCES[n.audience as AudienceType] || n.audience}
+                  </Badge>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">{n.body}</p>
                 <p className="mt-2 text-xs text-muted-foreground">
