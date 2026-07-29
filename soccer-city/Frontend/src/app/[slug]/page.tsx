@@ -3,9 +3,14 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
-// ✅ Forcer le rendu dynamique pour éviter les erreurs de build
+// ✅ Forcer le rendu dynamique
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// ✅ Désactiver la génération statique pour cette route
+export const generateStaticParams = async () => {
+  return [];
+};
 
 interface PageParams {
   params: {
@@ -13,33 +18,21 @@ interface PageParams {
   };
 }
 
+// ✅ Simplifier generateMetadata - PAS d'appel à Supabase
 export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
-  try {
-    // Vérifier que Supabase est configuré
-    if (!isSupabaseConfigured()) {
-      return {
-        title: 'Page',
-        description: 'Page du site Soccer City',
-      };
-    }
-
-    const { data } = await supabase
-      .from('pages')
-      .select('title')
-      .eq('slug', params.slug)
-      .single();
-
-    return {
-      title: data?.title || 'Page',
-      description: `Page ${data?.title || ''} - Soccer City`,
-    };
-  } catch (error) {
-    console.error('❌ Erreur generateMetadata:', error);
-    return {
-      title: 'Page',
-      description: 'Page du site Soccer City',
-    };
-  }
+  // Retourner des métadonnées simples sans appel à Supabase
+  const titles: Record<string, string> = {
+    'confidentialite': 'Politique de confidentialité',
+    'conditions': "Conditions d'utilisation",
+    'mentions-legales': 'Mentions légales',
+  };
+  
+  const title = titles[params.slug] || 'Page';
+  
+  return {
+    title: `${title} | Soccer City`,
+    description: `Page ${title} - Soccer City`,
+  };
 }
 
 export default async function DynamicPage({ params }: PageParams) {
