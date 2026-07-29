@@ -1,12 +1,19 @@
+// lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Valeurs par défaut pour éviter les erreurs de build
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
 // Vérification des variables d'environnement
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('⚠️ Variables Supabase manquantes. Vérifiez votre fichier .env.local');
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  console.warn('⚠️ Variables Supabase manquantes. Utilisation de valeurs par défaut.');
 }
+
+// Fonction pour vérifier si Supabase est configuré
+export const isSupabaseConfigured = () => {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+};
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
@@ -23,6 +30,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Fonction pour vérifier la connexion
 export const checkSupabaseConnection = async () => {
   try {
+    if (!isSupabaseConfigured()) {
+      console.warn('⚠️ Supabase non configuré');
+      return false;
+    }
     const { data, error } = await supabase.from('fields').select('count', { count: 'exact', head: true });
     if (error) throw error;
     console.log('✅ Connexion Supabase établie');
@@ -36,6 +47,9 @@ export const checkSupabaseConnection = async () => {
 // Fonction pour obtenir l'utilisateur actuel
 export const getCurrentUser = async () => {
   try {
+    if (!isSupabaseConfigured()) {
+      return null;
+    }
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw error;
     return user;
@@ -48,6 +62,9 @@ export const getCurrentUser = async () => {
 // Fonction pour vérifier si l'utilisateur est admin
 export const isUserAdmin = async () => {
   try {
+    if (!isSupabaseConfigured()) {
+      return false;
+    }
     const user = await getCurrentUser();
     if (!user) return false;
     
@@ -68,6 +85,9 @@ export const isUserAdmin = async () => {
 // Fonction pour se déconnecter
 export const signOut = async () => {
   try {
+    if (!isSupabaseConfigured()) {
+      return false;
+    }
     await supabase.auth.signOut();
     return true;
   } catch (error) {
