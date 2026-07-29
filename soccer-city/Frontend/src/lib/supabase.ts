@@ -17,7 +17,16 @@ export const isSupabaseConfigured = () => {
            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== DEFAULT_SUPABASE_ANON_KEY);
 };
 
-// Logger l'état au démarrage
+// ✅ Obtenir les headers d'authentification
+export const getSupabaseHeaders = () => {
+  return {
+    'apikey': supabaseAnonKey,
+    'Authorization': `Bearer ${supabaseAnonKey}`,
+    'Content-Type': 'application/json',
+  };
+};
+
+// Logger l'état au démarrage (uniquement côté client)
 if (typeof window !== 'undefined') {
   console.log('🔧 Supabase configuré:', isSupabaseConfigured());
   if (isSupabaseConfigured()) {
@@ -27,7 +36,7 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Créer le client Supabase
+// Créer le client Supabase avec les headers d'authentification
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
@@ -37,7 +46,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true
-  }
+  },
+  global: {
+    headers: {
+      'apikey': supabaseAnonKey,
+      'Authorization': `Bearer ${supabaseAnonKey}`,
+    },
+  },
 });
 
 // Fonction pour vérifier la connexion
@@ -134,4 +149,24 @@ export const safeSupabaseQuery = async <T>(
     console.error('❌ Erreur requête Supabase:', error);
     return fallbackData;
   }
+};
+
+// ✅ Fonction pour faire des requêtes avec fetch direct (solution de contournement)
+export const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
+  const url = `${supabaseUrl}/rest/v1/${endpoint}`;
+  const headers = {
+    ...getSupabaseHeaders(),
+    ...options.headers,
+  };
+  
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+  
+  return response.json();
 };
