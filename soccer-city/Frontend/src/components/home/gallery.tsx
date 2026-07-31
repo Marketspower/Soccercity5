@@ -9,10 +9,15 @@ import { Reveal } from "@/components/motion/reveal";
 import { useAppStore } from "@/lib/store";
 
 export function Gallery() {
-  const { gallery, loadGallery } = useAppStore();
+  const { gallery, syncGallery } = useAppStore();
   const [index, setIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadGallery = async () => {
+      await syncGallery();
+      setLoading(false);
+    };
     loadGallery();
   }, []);
 
@@ -35,7 +40,20 @@ export function Gallery() {
     };
   }, [index, close, prev, next]);
 
-  if (gallery.length === 0) return null;
+  if (loading) {
+    return (
+      <section className="container py-24 md:py-32">
+        <div className="text-center">
+          <div className="animate-pulse text-4xl mb-4">🖼️</div>
+          <p className="text-muted-foreground">Chargement de la galerie...</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (gallery.length === 0) {
+    return null;
+  }
 
   return (
     <section id="galerie" className="container py-24 md:py-32">
@@ -63,6 +81,10 @@ export function Gallery() {
               src={img.imageUrl}
               alt={img.alt}
               className="w-full transition-transform duration-700 ease-out group-hover:scale-110"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
             />
             {img.event && (
               <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 rounded text-xs text-white">
@@ -100,6 +122,10 @@ export function Gallery() {
                 src={gallery[index].imageUrl}
                 alt={gallery[index].alt}
                 className="max-h-[85vh] w-full rounded-lg object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/images/placeholder.jpg';
+                }}
               />
               <p className="mt-3 text-center text-sm text-white/70">
                 {gallery[index].alt} — {index + 1} / {gallery.length}

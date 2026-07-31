@@ -12,7 +12,6 @@ import { useAppStore } from "@/lib/store";
 import { formatCAD } from "@/lib/utils";
 import type { Field } from "@/lib/types";
 
-// Composant Spec pour les caractéristiques
 function Spec({ Icon, label }: { Icon: React.ElementType; label: string }) {
   return (
     <li className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -22,9 +21,7 @@ function Spec({ Icon, label }: { Icon: React.ElementType; label: string }) {
   );
 }
 
-// Carte d'un terrain
 function FieldCard({ field }: { field: Field }) {
-  // Utiliser l'image du terrain depuis la base de données
   const imageUrl = field.image || '';
 
   return (
@@ -39,9 +36,16 @@ function FieldCard({ field }: { field: Field }) {
             sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover transition-transform duration-700 group-hover:scale-105"
             onError={(e) => {
-              // Si l'image ne charge pas, afficher un fallback
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';
+              // Afficher le fallback
+              const parent = target.parentElement;
+              if (parent) {
+                const fallback = document.createElement('div');
+                fallback.className = 'flex h-full w-full items-center justify-center bg-primary/5';
+                fallback.innerHTML = '<span class="text-6xl">⚽</span>';
+                parent.appendChild(fallback);
+              }
             }}
           />
         ) : (
@@ -89,30 +93,29 @@ function FieldCard({ field }: { field: Field }) {
   );
 }
 
-// Composant principal Fields
 export function Fields() {
-  const { fields, loadFields, isLoading, gallery } = useAppStore();
+  const { fields, loadFields, isLoading, gallery, syncGallery } = useAppStore();
   const [fieldsWithImages, setFieldsWithImages] = useState<Field[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🔄 Chargement des terrains...');
     loadFields();
+    syncGallery();
   }, []);
 
   useEffect(() => {
     // Associer les images de la galerie aux terrains
     if (fields.length > 0) {
       const updatedFields = fields.map(field => {
-        // Si le terrain a une image, l'utiliser
-        if (field.image) {
+        // Si le terrain a déjà une image valide, la garder
+        if (field.image && field.image.startsWith('http')) {
           return field;
         }
         
-        // Sinon, chercher dans la galerie une image associée à ce terrain
+        // Chercher une image dans la galerie associée à ce terrain
         const galleryImage = gallery.find(g => 
           g.alt?.toLowerCase().includes(field.name.toLowerCase()) ||
-          g.eventId === field.id
+          g.eventId === field.id ||
+          g.imageUrl?.includes(field.slug || '')
         );
         
         if (galleryImage) {
@@ -122,22 +125,14 @@ export function Fields() {
         return field;
       });
       setFieldsWithImages(updatedFields);
-      setLoading(false);
     } else {
-      setFieldsWithImages([]);
-      setLoading(false);
+      setFieldsWithImages(fields);
     }
   }, [fields, gallery]);
 
-  useEffect(() => {
-    console.log('📊 Terrains dans le store:', fields);
-    console.log('📸 Images dans la galerie:', gallery);
-  }, [fields, gallery]);
-
-  // Filtrer les terrains actifs
   const activeFields = fieldsWithImages.filter(f => f.active);
 
-  if (isLoading || loading) {
+  if (isLoading) {
     return (
       <section className="container py-16">
         <div className="text-center">
@@ -172,7 +167,7 @@ export function Fields() {
             Choisissez votre <span className="text-primary">surface de jeu</span>
           </h2>
           <p className="mt-4 text-muted-foreground">
-            {activeFields.length} terrains disponibles · Du 5 contre 5 rapide au 11 contre 11 grand format.
+            {activeFields.length} terrains disponibles
           </p>
         </Reveal>
 

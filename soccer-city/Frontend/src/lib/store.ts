@@ -3,8 +3,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { supabase, getSupabaseHeaders, isSupabaseConfigured, fetchWithAuth } from "./supabase";
-import { getCurrentUser, isUserAdmin } from "./supabase";
+import { supabase, getCurrentUser, isUserAdmin } from "./supabase";
 import type { 
   Field, 
   Reservation, 
@@ -339,37 +338,12 @@ export const useAppStore = create<AppState>()(
       syncFields: async () => {
         try {
           console.log('🔄 Synchronisation des terrains...');
-          
-          // Vérifier si Supabase est configuré
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ fields: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('fields')
             .select('*')
             .order('created_at', { ascending: true });
           
-          if (error) {
-            // Si erreur 401, essayer avec fetch direct
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('fields?select=*&order=created_at.asc');
-                set({ fields: result || [] });
-                console.log(`✅ ${result?.length || 0} terrains synchronisés (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ fields: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ fields: data || [] });
           console.log(`✅ ${data?.length || 0} terrains synchronisés`);
         } catch (error) {
@@ -381,13 +355,6 @@ export const useAppStore = create<AppState>()(
       syncGallery: async () => {
         try {
           console.log('🔄 Synchronisation de la galerie...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ gallery: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('gallery')
             .select(`
@@ -401,23 +368,7 @@ export const useAppStore = create<AppState>()(
             `)
             .order('sort_order', { ascending: true });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('gallery?select=*,event:private_events(id,first_name,last_name,type)&order=sort_order.asc');
-                set({ gallery: result || [] });
-                console.log(`✅ ${result?.length || 0} images synchronisées (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ gallery: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ gallery: data || [] });
           console.log(`✅ ${data?.length || 0} images synchronisées`);
         } catch (error) {
@@ -429,13 +380,6 @@ export const useAppStore = create<AppState>()(
       syncMedia: async () => {
         try {
           console.log('🔄 Synchronisation des médias...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ media: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('media')
             .select(`
@@ -449,23 +393,7 @@ export const useAppStore = create<AppState>()(
             `)
             .order('created_at', { ascending: false });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('media?select=*,event:private_events(id,first_name,last_name,type)&order=created_at.desc');
-                set({ media: result || [] });
-                console.log(`✅ ${result?.length || 0} médias synchronisés (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ media: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ media: data || [] });
           console.log(`✅ ${data?.length || 0} médias synchronisés`);
         } catch (error) {
@@ -477,35 +405,12 @@ export const useAppStore = create<AppState>()(
       syncReservations: async () => {
         try {
           console.log('🔄 Synchronisation des réservations...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ reservations: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('reservations')
             .select('*')
             .order('created_at', { ascending: false });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('reservations?select=*&order=created_at.desc');
-                set({ reservations: result || [] });
-                console.log(`✅ ${result?.length || 0} réservations synchronisées (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ reservations: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ reservations: data || [] });
           console.log(`✅ ${data?.length || 0} réservations synchronisées`);
         } catch (error) {
@@ -517,13 +422,6 @@ export const useAppStore = create<AppState>()(
       syncEvents: async () => {
         try {
           console.log('🔄 Synchronisation des événements...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ events: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('private_events')
             .select(`
@@ -533,23 +431,7 @@ export const useAppStore = create<AppState>()(
             `)
             .order('created_at', { ascending: false });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('private_events?select=*,media:media(*),gallery:gallery(*)&order=created_at.desc');
-                set({ events: result || [] });
-                console.log(`✅ ${result?.length || 0} événements synchronisés (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ events: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ events: data || [] });
           console.log(`✅ ${data?.length || 0} événements synchronisés`);
         } catch (error) {
@@ -561,35 +443,12 @@ export const useAppStore = create<AppState>()(
       syncBlocked: async () => {
         try {
           console.log('🔄 Synchronisation des disponibilités...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ blocked: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('availability')
             .select('*')
             .order('date', { ascending: true });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('availability?select=*&order=date.asc');
-                set({ blocked: result || [] });
-                console.log(`✅ ${result?.length || 0} créneaux synchronisés (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ blocked: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ blocked: data || [] });
           console.log(`✅ ${data?.length || 0} créneaux synchronisés`);
         } catch (error) {
@@ -601,35 +460,12 @@ export const useAppStore = create<AppState>()(
       syncPricing: async () => {
         try {
           console.log('🔄 Synchronisation des tarifs...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ pricing: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('pricing')
             .select('*')
             .order('sort_order', { ascending: true });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('pricing?select=*&order=sort_order.asc');
-                set({ pricing: result || [] });
-                console.log(`✅ ${result?.length || 0} tarifs synchronisés (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ pricing: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ pricing: data || [] });
           console.log(`✅ ${data?.length || 0} tarifs synchronisés`);
         } catch (error) {
@@ -641,34 +477,11 @@ export const useAppStore = create<AppState>()(
       syncStats: async () => {
         try {
           console.log('🔄 Synchronisation des statistiques...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ stats: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('stats')
             .select('*');
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('stats?select=*');
-                set({ stats: result || [] });
-                console.log(`✅ ${result?.length || 0} statistiques synchronisées (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ stats: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ stats: data || [] });
           console.log(`✅ ${data?.length || 0} statistiques synchronisées`);
         } catch (error) {
@@ -680,35 +493,12 @@ export const useAppStore = create<AppState>()(
       syncRatings: async () => {
         try {
           console.log('🔄 Synchronisation des évaluations...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ ratings: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('ratings')
             .select('*')
             .order('created_at', { ascending: false });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('ratings?select=*&order=created_at.desc');
-                set({ ratings: result || [] });
-                console.log(`✅ ${result?.length || 0} évaluations synchronisées (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ ratings: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ ratings: data || [] });
           console.log(`✅ ${data?.length || 0} évaluations synchronisées`);
         } catch (error) {
@@ -720,35 +510,12 @@ export const useAppStore = create<AppState>()(
       syncPages: async () => {
         try {
           console.log('🔄 Synchronisation des pages...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ pages: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('pages')
             .select('*')
             .order('created_at', { ascending: false });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('pages?select=*&order=created_at.desc');
-                set({ pages: result || [] });
-                console.log(`✅ ${result?.length || 0} pages synchronisées (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ pages: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ pages: data || [] });
           console.log(`✅ ${data?.length || 0} pages synchronisées`);
         } catch (error) {
@@ -760,35 +527,12 @@ export const useAppStore = create<AppState>()(
       syncNotifications: async () => {
         try {
           console.log('🔄 Synchronisation des notifications...');
-          
-          if (!isSupabaseConfigured()) {
-            console.warn('⚠️ Supabase non configuré');
-            set({ notifications: [] });
-            return;
-          }
-
           const { data, error } = await supabase
             .from('notifications')
             .select('*')
             .order('sent_at', { ascending: false });
           
-          if (error) {
-            if (error.code === '401' || error.message?.includes('401')) {
-              console.log('🔄 Tentative avec fetch direct...');
-              try {
-                const result = await fetchWithAuth('notifications?select=*&order=sent_at.desc');
-                set({ notifications: result || [] });
-                console.log(`✅ ${result?.length || 0} notifications synchronisées (fetch direct)`);
-                return;
-              } catch (fetchError) {
-                console.error('❌ Erreur fetch direct:', fetchError);
-                set({ notifications: [] });
-                return;
-              }
-            }
-            throw error;
-          }
-          
+          if (error) throw error;
           set({ notifications: data || [] });
           console.log(`✅ ${data?.length || 0} notifications synchronisées`);
         } catch (error) {
@@ -1321,8 +1065,7 @@ export const useAppStore = create<AppState>()(
             .insert([{
               title: n.title,
               body: n.body,
-              audience: n.audience || 'all',
-              sent_by: null
+              audience: n.audience || 'all'
             }])
             .select()
             .single();

@@ -1,13 +1,15 @@
+// components/home/hero.tsx
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { PartyPopper, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter } from "@/components/motion/counter";
 import { useAppStore } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 
 export function Hero() {
   const ref = useRef<HTMLElement>(null);
@@ -19,9 +21,39 @@ export function Hero() {
   const fade = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
   const { stats, loadStats } = useAppStore();
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [posterUrl, setPosterUrl] = useState<string>("");
 
   useEffect(() => {
     loadStats();
+    
+    // Récupérer la vidéo depuis Supabase Storage
+    const fetchVideo = async () => {
+      try {
+        // Récupérer la vidéo depuis la table media
+        const { data, error } = await supabase
+          .from('media')
+          .select('url, thumbnail')
+          .eq('type', 'video')
+          .eq('is_featured', true)
+          .maybeSingle();
+        
+        if (error) throw error;
+        
+        if (data) {
+          setVideoUrl(data.url);
+          if (data.thumbnail) {
+            setPosterUrl(data.thumbnail);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erreur chargement vidéo:', error);
+        // Fallback vers une URL par défaut
+        setVideoUrl('/videos/hero.mp4');
+      }
+    };
+    
+    fetchVideo();
   }, []);
 
   // Récupérer les valeurs des statistiques
@@ -45,16 +77,18 @@ export function Hero() {
         className="absolute inset-0 gpu"
         aria-hidden
       >
-        <video
-          className="absolute inset-0 h-full w-full object-cover opacity-40"
-          autoPlay
-          muted
-          loop
-          playsInline
-          poster="/fields/field-3.svg"
-        >
-          <source src="/hero.mp4" type="video/mp4" />
-        </video>
+        {videoUrl && (
+          <video
+            className="absolute inset-0 h-full w-full object-cover opacity-40"
+            autoPlay
+            muted
+            loop
+            playsInline
+            poster={posterUrl || '/images/hero-poster.jpg'}
+          >
+            <source src={videoUrl} type="video/mp4" />
+          </video>
+        )}
 
         <div className="absolute inset-0 bg-hero-radial" />
         <div className="absolute inset-0 bg-field-lines" />

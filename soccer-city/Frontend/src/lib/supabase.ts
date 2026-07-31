@@ -1,23 +1,27 @@
 // lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 
-// Valeurs par défaut pour le build (évite les erreurs)
-const DEFAULT_SUPABASE_URL = 'https://placeholder.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'placeholder-key';
+// Valeurs par défaut pour éviter les erreurs
+const DEFAULT_URL = 'https://placeholder.supabase.co';
+const DEFAULT_KEY = 'placeholder-key';
 
-// Récupérer les variables d'environnement
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_KEY;
 
-// Vérifier si Supabase est configuré pour de vrai
+// Vérification des variables d'environnement
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  console.warn('⚠️ Variables Supabase manquantes. Vérifiez votre fichier .env.local');
+}
+
+// Vérifier si Supabase est configuré
 export const isSupabaseConfigured = () => {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && 
-           process.env.NEXT_PUBLIC_SUPABASE_URL !== DEFAULT_SUPABASE_URL &&
+           process.env.NEXT_PUBLIC_SUPABASE_URL !== DEFAULT_URL &&
            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && 
-           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== DEFAULT_SUPABASE_ANON_KEY);
+           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== DEFAULT_KEY);
 };
 
-// ✅ Obtenir les headers d'authentification
+// Obtenir les headers d'authentification
 export const getSupabaseHeaders = () => {
   return {
     'apikey': supabaseAnonKey,
@@ -26,7 +30,7 @@ export const getSupabaseHeaders = () => {
   };
 };
 
-// Logger l'état au démarrage (uniquement côté client)
+// Logger l'état (uniquement côté client)
 if (typeof window !== 'undefined') {
   console.log('🔧 Supabase configuré:', isSupabaseConfigured());
   if (isSupabaseConfigured()) {
@@ -36,7 +40,7 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Créer le client Supabase avec les headers d'authentification
+// Créer le client Supabase
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
@@ -63,10 +67,7 @@ export const checkSupabaseConnection = async () => {
   }
   
   try {
-    const { data, error } = await supabase
-      .from('fields')
-      .select('count', { count: 'exact', head: true });
-    
+    const { data, error } = await supabase.from('fields').select('count', { count: 'exact', head: true });
     if (error) throw error;
     console.log('✅ Connexion Supabase établie');
     return true;
@@ -131,28 +132,12 @@ export const signOut = async () => {
   }
 };
 
-// Fonction utilitaire pour les requêtes avec fallback
-export const safeSupabaseQuery = async <T>(
-  queryFn: () => Promise<{ data: T | null; error: any }>,
-  fallbackData: T
-): Promise<T> => {
+// Fonction pour faire des requêtes avec fetch direct
+export const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
   if (!isSupabaseConfigured()) {
-    console.warn('⚠️ Supabase non configuré - Utilisation des données de fallback');
-    return fallbackData;
+    throw new Error('Supabase non configuré');
   }
   
-  try {
-    const { data, error } = await queryFn();
-    if (error) throw error;
-    return data || fallbackData;
-  } catch (error) {
-    console.error('❌ Erreur requête Supabase:', error);
-    return fallbackData;
-  }
-};
-
-// ✅ Fonction pour faire des requêtes avec fetch direct (solution de contournement)
-export const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
   const url = `${supabaseUrl}/rest/v1/${endpoint}`;
   const headers = {
     ...getSupabaseHeaders(),
