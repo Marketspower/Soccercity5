@@ -25,6 +25,24 @@ import type {
 // API Backend URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+// ✅ Fonction utilitaire pour nettoyer les données des terrains
+const sanitizeFieldData = (data: any) => {
+  return {
+    name: data.name?.trim(),
+    slug: data.slug?.toLowerCase().replace(/\s+/g, '-') || data.name?.toLowerCase().replace(/\s+/g, '-'),
+    image_url: data.image || null,
+    dimensions: data.dimensions || '40 × 20 m',
+    turf: data.turf || 'Gazon synthétique 5G',
+    lighting: data.lighting ?? true,
+    locker_rooms: Number(data.lockerRooms) || 2,
+    parking: data.parking ?? true,
+    players: data.players || '5 vs 5',
+    price_per_hour: Number(data.pricePerHour) || 90,
+    indoor: data.indoor ?? false,
+    active: data.active ?? true,
+  };
+};
+
 interface AppState {
   // État
   fields: Field[];
@@ -598,26 +616,21 @@ export const useAppStore = create<AppState>()(
       // ============================================
       addField: async (f) => {
         try {
+          // ✅ Nettoyer et convertir les données
+          const insertData = sanitizeFieldData(f);
+          
+          console.log('📝 Création du terrain:', insertData);
+
           const { data, error } = await supabase
             .from('fields')
-            .insert([{
-              name: f.name,
-              slug: f.name.toLowerCase().replace(/\s+/g, '-'),
-              image_url: f.image || '/fields/default.svg',
-              dimensions: f.dimensions,
-              turf: f.turf,
-              lighting: f.lighting,
-              locker_rooms: f.lockerRooms,
-              parking: f.parking,
-              players: f.players,
-              price_per_hour: f.pricePerHour,
-              indoor: f.indoor,
-              active: f.active !== undefined ? f.active : true
-            }])
+            .insert([insertData])
             .select()
             .single();
 
-          if (error) throw error;
+          if (error) {
+            console.error('❌ Erreur addField:', error);
+            throw error;
+          }
           
           await get().syncFields();
           console.log('✅ Terrain ajouté:', data);
@@ -630,26 +643,34 @@ export const useAppStore = create<AppState>()(
 
       updateField: async (id, patch) => {
         try {
+          // ✅ Nettoyer et convertir les données
+          const updateData: any = {};
+          
+          if (patch.name !== undefined) updateData.name = patch.name.trim();
+          if (patch.image !== undefined) updateData.image_url = patch.image || null;
+          if (patch.dimensions !== undefined) updateData.dimensions = patch.dimensions;
+          if (patch.turf !== undefined) updateData.turf = patch.turf;
+          if (patch.lighting !== undefined) updateData.lighting = patch.lighting;
+          if (patch.lockerRooms !== undefined) updateData.locker_rooms = Number(patch.lockerRooms);
+          if (patch.parking !== undefined) updateData.parking = patch.parking;
+          if (patch.players !== undefined) updateData.players = patch.players;
+          if (patch.pricePerHour !== undefined) updateData.price_per_hour = Number(patch.pricePerHour);
+          if (patch.indoor !== undefined) updateData.indoor = patch.indoor;
+          if (patch.active !== undefined) updateData.active = patch.active;
+
+          console.log('🔄 Mise à jour du terrain:', { id, updateData });
+
           const { data, error } = await supabase
             .from('fields')
-            .update({
-              name: patch.name,
-              image_url: patch.image,
-              dimensions: patch.dimensions,
-              turf: patch.turf,
-              lighting: patch.lighting,
-              locker_rooms: patch.lockerRooms,
-              parking: patch.parking,
-              players: patch.players,
-              price_per_hour: patch.pricePerHour,
-              indoor: patch.indoor,
-              active: patch.active
-            })
+            .update(updateData)
             .eq('id', id)
             .select()
             .single();
 
-          if (error) throw error;
+          if (error) {
+            console.error('❌ Erreur updateField:', error);
+            throw error;
+          }
           
           await get().syncFields();
           console.log('✅ Terrain mis à jour:', data);
@@ -1065,7 +1086,8 @@ export const useAppStore = create<AppState>()(
             .insert([{
               title: n.title,
               body: n.body,
-              audience: n.audience || 'all'
+              audience: n.audience || 'all',
+              sent_by: null
             }])
             .select()
             .single();
