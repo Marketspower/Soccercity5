@@ -108,12 +108,42 @@ export default function AdminFields() {
     }
   };
 
+  // ✅ Fonction save corrigée avec validation et conversion de types
   const save = () => {
-    if (!draft.name.trim()) return;
-    const payload = { ...draft, slug: draft.name.toLowerCase().replace(/\s+/g, "-") };
-    if (editingId) updateField(editingId, payload);
-    else addField(payload);
-    setOpen(false);
+    if (!draft.name.trim()) {
+      alert('Le nom du terrain est requis');
+      return;
+    }
+
+    // ✅ Nettoyer et convertir les données
+    const payload = {
+      name: draft.name.trim(),
+      slug: draft.name.toLowerCase().replace(/\s+/g, '-'),
+      image: draft.image || '',
+      dimensions: draft.dimensions || '40 × 20 m',
+      turf: draft.turf || 'Gazon synthétique 5G',
+      lighting: draft.lighting ?? true,
+      lockerRooms: Number(draft.lockerRooms) || 2,
+      parking: draft.parking ?? true,
+      players: draft.players || '5 vs 5',
+      pricePerHour: Number(draft.pricePerHour) || 90,
+      indoor: draft.indoor ?? false,
+      active: draft.active ?? true,
+    };
+
+    console.log('📝 Sauvegarde:', editingId ? 'Mise à jour' : 'Création', payload);
+
+    try {
+      if (editingId) {
+        updateField(editingId, payload);
+      } else {
+        addField(payload);
+      }
+      setOpen(false);
+    } catch (error) {
+      console.error('❌ Erreur lors de la sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde du terrain');
+    }
   };
 
   const setValue = <K extends keyof Omit<Field, "id" | "created_at">>(key: K, value: (typeof draft)[K]) =>
