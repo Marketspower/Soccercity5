@@ -21,7 +21,7 @@ export const isSupabaseConfigured = () => {
            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== DEFAULT_KEY);
 };
 
-// Obtenir les headers d'authentification
+// Obtenir les headers d'authentification (utilisé uniquement pour des appels fetch manuels, pas par le client `supabase`)
 export const getSupabaseHeaders = () => {
   return {
     'apikey': supabaseAnonKey,
@@ -40,7 +40,7 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Créer le client Supabase
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
@@ -50,12 +50,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true
-  },
-  global: {
-    headers: {
-      'apikey': supabaseAnonKey,
-      'Authorization': `Bearer ${supabaseAnonKey}`,
-    },
   },
 });
 
@@ -132,7 +126,7 @@ export const signOut = async () => {
   }
 };
 
-// Fonction pour faire des requêtes avec fetch direct
+// Fonction pour faire des requêtes avec fetch direct (indépendante du client `supabase`, n'est pas affectée par la session utilisateur)
 export const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
   if (!isSupabaseConfigured()) {
     throw new Error('Supabase non configuré');
