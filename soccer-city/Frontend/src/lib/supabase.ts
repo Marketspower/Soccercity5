@@ -40,7 +40,6 @@ if (typeof window !== 'undefined') {
   }
 }
 
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
@@ -78,6 +77,10 @@ export const getCurrentUser = async () => {
   }
   
   try {
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw error;
     return user;
