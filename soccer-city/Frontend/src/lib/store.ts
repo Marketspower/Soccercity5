@@ -92,18 +92,18 @@ interface AppState {
 
   // Gestion des terrains
   addField: (f: Omit<Field, "id" | "created_at">) => Promise<Field>;
-  updateField: (id: string, patch: Partial<Field>) => Promise<Field | undefined>;
+  updateField: (id: string, patch: Partial<Field>) => Promise<Field>;
   removeField: (id: string) => Promise<void>;
 
   // Gestion de la galerie
   addGalleryImage: (data: CreateGalleryImage) => Promise<GalleryImage>;
-  updateGalleryImage: (id: string, data: Partial<GalleryImage>) => Promise<GalleryImage | undefined>;
+  updateGalleryImage: (id: string, data: Partial<GalleryImage>) => Promise<GalleryImage>;
   deleteGalleryImage: (id: string) => Promise<void>;
   reorderGalleryImages: (ids: string[]) => Promise<GalleryImage[]>;
 
   // Gestion des médias
   addMediaItem: (data: CreateMediaItem) => Promise<MediaItem>;
-  updateMediaItem: (id: string, data: Partial<MediaItem>) => Promise<MediaItem | undefined>;
+  updateMediaItem: (id: string, data: Partial<MediaItem>) => Promise<MediaItem>;
   deleteMediaItem: (id: string) => Promise<void>;
 
   // Upload
@@ -130,7 +130,7 @@ interface AppState {
 
   // Pages CMS
   createPage: (page: Omit<Page, "id" | "created_at" | "updated_at">) => Promise<Page>;
-  updatePage: (id: string, page: Partial<Page>) => Promise<Page | undefined>;
+  updatePage: (id: string, page: Partial<Page>) => Promise<Page>;
   deletePage: (id: string) => Promise<void>;
 
   // Admin
@@ -600,7 +600,9 @@ export const useAppStore = create<AppState>()(
           }
           
           await get().syncFields();
-          return get().fields.find((field) => field.id === id);
+          const updated = get().fields.find((field) => field.id === id);
+          if (!updated) throw new Error(`Terrain ${id} introuvable après mise à jour`);
+          return updated;
         } catch (error) {
           console.error('❌ Erreur updateField:', error);
           throw error;
@@ -672,7 +674,9 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncGallery();
-          return get().gallery.find((g) => g.id === id);
+          const updated = get().gallery.find((g) => g.id === id);
+          if (!updated) throw new Error(`Image ${id} introuvable après mise à jour`);
+          return updated;
         } catch (error) {
           console.error('❌ Erreur updateGalleryImage:', error);
           throw error;
@@ -788,7 +792,9 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncMedia();
-          return get().media.find((m) => m.id === id);
+          const updated = get().media.find((m) => m.id === id);
+          if (!updated) throw new Error(`Média ${id} introuvable après mise à jour`);
+          return updated;
         } catch (error) {
           console.error('❌ Erreur updateMediaItem:', error);
           throw error;
@@ -1079,7 +1085,9 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncPages();
-          return get().pages.find((p) => p.id === id);
+          const updated = get().pages.find((p) => p.id === id);
+          if (!updated) throw new Error(`Page ${id} introuvable après mise à jour`);
+          return updated;
         } catch (error) {
           console.error('❌ Erreur updatePage:', error);
           throw error;
