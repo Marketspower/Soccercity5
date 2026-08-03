@@ -108,8 +108,8 @@ export default function AdminFields() {
     }
   };
 
-  // ✅ Fonction save corrigée avec validation et conversion de types
-  const save = () => {
+  // ✅ Fonction save avec validation et conversion de types
+  const save = async () => {
     if (!draft.name.trim()) {
       alert('Le nom du terrain est requis');
       return;
@@ -131,13 +131,11 @@ export default function AdminFields() {
       active: draft.active ?? true,
     };
 
-    console.log('📝 Sauvegarde:', editingId ? 'Mise à jour' : 'Création', payload);
-
     try {
       if (editingId) {
-        updateField(editingId, payload);
+        await updateField(editingId, payload);
       } else {
-        addField(payload);
+        await addField(payload);
       }
       setOpen(false);
     } catch (error) {
