@@ -92,18 +92,18 @@ interface AppState {
 
   // Gestion des terrains
   addField: (f: Omit<Field, "id" | "created_at">) => Promise<Field>;
-  updateField: (id: string, patch: Partial<Field>) => Promise<Field>;
+  updateField: (id: string, patch: Partial<Field>) => Promise<Field | undefined>;
   removeField: (id: string) => Promise<void>;
 
   // Gestion de la galerie
   addGalleryImage: (data: CreateGalleryImage) => Promise<GalleryImage>;
-  updateGalleryImage: (id: string, data: Partial<GalleryImage>) => Promise<GalleryImage>;
+  updateGalleryImage: (id: string, data: Partial<GalleryImage>) => Promise<GalleryImage | undefined>;
   deleteGalleryImage: (id: string) => Promise<void>;
   reorderGalleryImages: (ids: string[]) => Promise<GalleryImage[]>;
 
   // Gestion des médias
   addMediaItem: (data: CreateMediaItem) => Promise<MediaItem>;
-  updateMediaItem: (id: string, data: Partial<MediaItem>) => Promise<MediaItem>;
+  updateMediaItem: (id: string, data: Partial<MediaItem>) => Promise<MediaItem | undefined>;
   deleteMediaItem: (id: string) => Promise<void>;
 
   // Upload
@@ -130,7 +130,7 @@ interface AppState {
 
   // Pages CMS
   createPage: (page: Omit<Page, "id" | "created_at" | "updated_at">) => Promise<Page>;
-  updatePage: (id: string, page: Partial<Page>) => Promise<Page>;
+  updatePage: (id: string, page: Partial<Page>) => Promise<Page | undefined>;
   deletePage: (id: string) => Promise<void>;
 
   // Admin
@@ -225,125 +225,81 @@ export const useAppStore = create<AppState>()(
       setupRealtime: () => {
         console.log('📡 Configuration des canaux Realtime...');
 
-        // Terrains
         supabase
           .channel('fields-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'fields' }, 
-            () => {
-              console.log('🔄 Mise à jour des terrains');
-              get().syncFields();
-            })
+            () => { get().syncFields(); })
           .subscribe();
 
-        // Galerie
         supabase
           .channel('gallery-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'gallery' }, 
-            () => {
-              console.log('🔄 Mise à jour de la galerie');
-              get().syncGallery();
-            })
+            () => { get().syncGallery(); })
           .subscribe();
 
-        // Médias
         supabase
           .channel('media-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'media' }, 
-            () => {
-              console.log('🔄 Mise à jour des médias');
-              get().syncMedia();
-            })
+            () => { get().syncMedia(); })
           .subscribe();
 
-        // Réservations
         supabase
           .channel('reservations-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'reservations' }, 
-            () => {
-              console.log('🔄 Mise à jour des réservations');
-              get().syncReservations();
-            })
+            () => { get().syncReservations(); })
           .subscribe();
 
-        // Événements
         supabase
           .channel('events-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'private_events' }, 
-            () => {
-              console.log('🔄 Mise à jour des événements');
-              get().syncEvents();
-            })
+            () => { get().syncEvents(); })
           .subscribe();
 
-        // Disponibilités
         supabase
           .channel('availability-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'availability' }, 
-            () => {
-              console.log('🔄 Mise à jour des disponibilités');
-              get().syncBlocked();
-            })
+            () => { get().syncBlocked(); })
           .subscribe();
 
-        // Tarifs
         supabase
           .channel('pricing-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'pricing' }, 
-            () => {
-              console.log('🔄 Mise à jour des tarifs');
-              get().syncPricing();
-            })
+            () => { get().syncPricing(); })
           .subscribe();
 
-        // Stats
         supabase
           .channel('stats-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'stats' }, 
-            () => {
-              console.log('🔄 Mise à jour des statistiques');
-              get().syncStats();
-            })
+            () => { get().syncStats(); })
           .subscribe();
 
-        // Ratings
         supabase
           .channel('ratings-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'ratings' }, 
-            () => {
-              console.log('🔄 Mise à jour des évaluations');
-              get().syncRatings();
-            })
+            () => { get().syncRatings(); })
           .subscribe();
 
-        // Pages
         supabase
           .channel('pages-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'pages' }, 
-            () => {
-              console.log('🔄 Mise à jour des pages');
-              get().syncPages();
-            })
+            () => { get().syncPages(); })
           .subscribe();
 
-        // Notifications
         supabase
           .channel('notifications-changes')
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'notifications' }, 
-            () => {
-              console.log('🔄 Mise à jour des notifications');
-              get().syncNotifications();
-            })
+            () => { get().syncNotifications(); })
           .subscribe();
 
         console.log('✅ Canaux Realtime configurés');
@@ -355,7 +311,6 @@ export const useAppStore = create<AppState>()(
       
       syncFields: async () => {
         try {
-          console.log('🔄 Synchronisation des terrains...');
           const { data, error } = await supabase
             .from('fields')
             .select('*')
@@ -363,7 +318,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ fields: data || [] });
-          console.log(`✅ ${data?.length || 0} terrains synchronisés`);
         } catch (error) {
           console.error('❌ Erreur syncFields:', error);
           set({ fields: [] });
@@ -372,7 +326,6 @@ export const useAppStore = create<AppState>()(
 
       syncGallery: async () => {
         try {
-          console.log('🔄 Synchronisation de la galerie...');
           const { data, error } = await supabase
             .from('gallery')
             .select(`
@@ -388,7 +341,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ gallery: data || [] });
-          console.log(`✅ ${data?.length || 0} images synchronisées`);
         } catch (error) {
           console.error('❌ Erreur syncGallery:', error);
           set({ gallery: [] });
@@ -397,7 +349,6 @@ export const useAppStore = create<AppState>()(
 
       syncMedia: async () => {
         try {
-          console.log('🔄 Synchronisation des médias...');
           const { data, error } = await supabase
             .from('media')
             .select(`
@@ -413,7 +364,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ media: data || [] });
-          console.log(`✅ ${data?.length || 0} médias synchronisés`);
         } catch (error) {
           console.error('❌ Erreur syncMedia:', error);
           set({ media: [] });
@@ -422,7 +372,6 @@ export const useAppStore = create<AppState>()(
 
       syncReservations: async () => {
         try {
-          console.log('🔄 Synchronisation des réservations...');
           const { data, error } = await supabase
             .from('reservations')
             .select('*')
@@ -430,7 +379,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ reservations: data || [] });
-          console.log(`✅ ${data?.length || 0} réservations synchronisées`);
         } catch (error) {
           console.error('❌ Erreur syncReservations:', error);
           set({ reservations: [] });
@@ -439,7 +387,6 @@ export const useAppStore = create<AppState>()(
 
       syncEvents: async () => {
         try {
-          console.log('🔄 Synchronisation des événements...');
           const { data, error } = await supabase
             .from('private_events')
             .select(`
@@ -451,7 +398,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ events: data || [] });
-          console.log(`✅ ${data?.length || 0} événements synchronisés`);
         } catch (error) {
           console.error('❌ Erreur syncEvents:', error);
           set({ events: [] });
@@ -460,7 +406,6 @@ export const useAppStore = create<AppState>()(
 
       syncBlocked: async () => {
         try {
-          console.log('🔄 Synchronisation des disponibilités...');
           const { data, error } = await supabase
             .from('availability')
             .select('*')
@@ -468,7 +413,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ blocked: data || [] });
-          console.log(`✅ ${data?.length || 0} créneaux synchronisés`);
         } catch (error) {
           console.error('❌ Erreur syncBlocked:', error);
           set({ blocked: [] });
@@ -477,7 +421,6 @@ export const useAppStore = create<AppState>()(
 
       syncPricing: async () => {
         try {
-          console.log('🔄 Synchronisation des tarifs...');
           const { data, error } = await supabase
             .from('pricing')
             .select('*')
@@ -485,7 +428,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ pricing: data || [] });
-          console.log(`✅ ${data?.length || 0} tarifs synchronisés`);
         } catch (error) {
           console.error('❌ Erreur syncPricing:', error);
           set({ pricing: [] });
@@ -494,14 +436,12 @@ export const useAppStore = create<AppState>()(
 
       syncStats: async () => {
         try {
-          console.log('🔄 Synchronisation des statistiques...');
           const { data, error } = await supabase
             .from('stats')
             .select('*');
           
           if (error) throw error;
           set({ stats: data || [] });
-          console.log(`✅ ${data?.length || 0} statistiques synchronisées`);
         } catch (error) {
           console.error('❌ Erreur syncStats:', error);
           set({ stats: [] });
@@ -510,7 +450,6 @@ export const useAppStore = create<AppState>()(
 
       syncRatings: async () => {
         try {
-          console.log('🔄 Synchronisation des évaluations...');
           const { data, error } = await supabase
             .from('ratings')
             .select('*')
@@ -518,7 +457,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ ratings: data || [] });
-          console.log(`✅ ${data?.length || 0} évaluations synchronisées`);
         } catch (error) {
           console.error('❌ Erreur syncRatings:', error);
           set({ ratings: [] });
@@ -527,7 +465,6 @@ export const useAppStore = create<AppState>()(
 
       syncPages: async () => {
         try {
-          console.log('🔄 Synchronisation des pages...');
           const { data, error } = await supabase
             .from('pages')
             .select('*')
@@ -535,7 +472,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ pages: data || [] });
-          console.log(`✅ ${data?.length || 0} pages synchronisées`);
         } catch (error) {
           console.error('❌ Erreur syncPages:', error);
           set({ pages: [] });
@@ -544,7 +480,6 @@ export const useAppStore = create<AppState>()(
 
       syncNotifications: async () => {
         try {
-          console.log('🔄 Synchronisation des notifications...');
           const { data, error } = await supabase
             .from('notifications')
             .select('*')
@@ -552,7 +487,6 @@ export const useAppStore = create<AppState>()(
           
           if (error) throw error;
           set({ notifications: data || [] });
-          console.log(`✅ ${data?.length || 0} notifications synchronisées`);
         } catch (error) {
           console.error('❌ Erreur syncNotifications:', error);
           set({ notifications: [] });
@@ -616,10 +550,7 @@ export const useAppStore = create<AppState>()(
       // ============================================
       addField: async (f) => {
         try {
-          // ✅ Nettoyer et convertir les données
           const insertData = sanitizeFieldData(f);
-          
-          console.log('📝 Création du terrain:', insertData);
 
           const { data, error } = await supabase
             .from('fields')
@@ -633,7 +564,6 @@ export const useAppStore = create<AppState>()(
           }
           
           await get().syncFields();
-          console.log('✅ Terrain ajouté:', data);
           return data as Field;
         } catch (error) {
           console.error('❌ Erreur addField:', error);
@@ -641,9 +571,10 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // ✅ CORRIGÉ : plus de .select().single() après update() (source du 406).
+      // On fait juste l'update, puis on resynchronise et on relit depuis le state local.
       updateField: async (id, patch) => {
         try {
-          // ✅ Nettoyer et convertir les données
           const updateData: any = {};
           
           if (patch.name !== undefined) updateData.name = patch.name.trim();
@@ -658,14 +589,10 @@ export const useAppStore = create<AppState>()(
           if (patch.indoor !== undefined) updateData.indoor = patch.indoor;
           if (patch.active !== undefined) updateData.active = patch.active;
 
-          console.log('🔄 Mise à jour du terrain:', { id, updateData });
-
-          const { data, error } = await supabase
+          const { error } = await supabase
             .from('fields')
             .update(updateData)
-            .eq('id', id)
-            .select()
-            .single();
+            .eq('id', id);
 
           if (error) {
             console.error('❌ Erreur updateField:', error);
@@ -673,8 +600,7 @@ export const useAppStore = create<AppState>()(
           }
           
           await get().syncFields();
-          console.log('✅ Terrain mis à jour:', data);
-          return data as Field;
+          return get().fields.find((field) => field.id === id);
         } catch (error) {
           console.error('❌ Erreur updateField:', error);
           throw error;
@@ -691,7 +617,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncFields();
-          console.log('✅ Terrain supprimé');
         } catch (error) {
           console.error('❌ Erreur removeField:', error);
           throw error;
@@ -725,7 +650,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncGallery();
-          console.log('✅ Image ajoutée à la galerie:', result);
           return result as GalleryImage;
         } catch (error) {
           console.error('❌ Erreur addGalleryImage:', error);
@@ -733,32 +657,22 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // ✅ CORRIGÉ : plus de .select().single() après update()
       updateGalleryImage: async (id, data) => {
         try {
-          const { data: result, error } = await supabase
+          const { error } = await supabase
             .from('gallery')
             .update({
               alt: data.alt,
               sort_order: data.sortOrder,
               event_id: data.eventId
             })
-            .eq('id', id)
-            .select(`
-              *,
-              event:private_events (
-                id,
-                first_name,
-                last_name,
-                type
-              )
-            `)
-            .single();
+            .eq('id', id);
 
           if (error) throw error;
           
           await get().syncGallery();
-          console.log('✅ Image mise à jour:', result);
-          return result as GalleryImage;
+          return get().gallery.find((g) => g.id === id);
         } catch (error) {
           console.error('❌ Erreur updateGalleryImage:', error);
           throw error;
@@ -771,7 +685,7 @@ export const useAppStore = create<AppState>()(
             .from('gallery')
             .select('image_url')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
           if (image?.image_url) {
             const path = image.image_url.split('/').pop();
@@ -791,7 +705,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncGallery();
-          console.log('✅ Image supprimée de la galerie');
         } catch (error) {
           console.error('❌ Erreur deleteGalleryImage:', error);
           throw error;
@@ -810,7 +723,6 @@ export const useAppStore = create<AppState>()(
           await Promise.all(updates);
           
           await get().syncGallery();
-          console.log('✅ Ordre de la galerie mis à jour');
           return get().gallery;
         } catch (error) {
           console.error('❌ Erreur reorderGalleryImages:', error);
@@ -849,7 +761,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncMedia();
-          console.log('✅ Média ajouté:', result);
           return result as MediaItem;
         } catch (error) {
           console.error('❌ Erreur addMediaItem:', error);
@@ -857,9 +768,10 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // ✅ CORRIGÉ : plus de .select().single() après update()
       updateMediaItem: async (id, data) => {
         try {
-          const { data: result, error } = await supabase
+          const { error } = await supabase
             .from('media')
             .update({
               title: data.title,
@@ -871,23 +783,12 @@ export const useAppStore = create<AppState>()(
               is_featured: data.isFeatured,
               event_id: data.eventId
             })
-            .eq('id', id)
-            .select(`
-              *,
-              event:private_events (
-                id,
-                first_name,
-                last_name,
-                type
-              )
-            `)
-            .single();
+            .eq('id', id);
 
           if (error) throw error;
           
           await get().syncMedia();
-          console.log('✅ Média mis à jour:', result);
-          return result as MediaItem;
+          return get().media.find((m) => m.id === id);
         } catch (error) {
           console.error('❌ Erreur updateMediaItem:', error);
           throw error;
@@ -900,7 +801,7 @@ export const useAppStore = create<AppState>()(
             .from('media')
             .select('url, thumbnail')
             .eq('id', id)
-            .single();
+            .maybeSingle();
 
           if (media?.url) {
             const path = media.url.split('/').pop();
@@ -930,7 +831,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncMedia();
-          console.log('✅ Média supprimé');
         } catch (error) {
           console.error('❌ Erreur deleteMediaItem:', error);
           throw error;
@@ -959,7 +859,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncReservations();
-          console.log('✅ Réservation ajoutée:', data);
           return data as Reservation;
         } catch (error) {
           console.error('❌ Erreur addReservation:', error);
@@ -976,7 +875,6 @@ export const useAppStore = create<AppState>()(
 
           if (error) throw error;
           await get().syncReservations();
-          console.log('✅ Statut de réservation mis à jour:', { id, status });
         } catch (error) {
           console.error('❌ Erreur setReservationStatus:', error);
           throw error;
@@ -1008,7 +906,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncEvents();
-          console.log('✅ Événement ajouté:', data);
           return data as PrivateEvent;
         } catch (error) {
           console.error('❌ Erreur addEvent:', error);
@@ -1025,7 +922,6 @@ export const useAppStore = create<AppState>()(
 
           if (error) throw error;
           await get().syncEvents();
-          console.log('✅ Statut d\'événement mis à jour:', { id, status });
         } catch (error) {
           console.error('❌ Erreur setEventStatus:', error);
           throw error;
@@ -1051,7 +947,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncBlocked();
-          console.log('✅ Créneau bloqué:', data);
           return data as BlockedSlot;
         } catch (error) {
           console.error('❌ Erreur blockSlot:', error);
@@ -1069,7 +964,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncBlocked();
-          console.log('✅ Créneau débloqué');
         } catch (error) {
           console.error('❌ Erreur unblockSlot:', error);
           throw error;
@@ -1095,7 +989,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncNotifications();
-          console.log('✅ Notification envoyée:', data);
           return data as AppNotification;
         } catch (error) {
           console.error('❌ Erreur sendNotification:', error);
@@ -1115,7 +1008,6 @@ export const useAppStore = create<AppState>()(
 
           if (error) throw error;
           await get().syncStats();
-          console.log('✅ Statistique mise à jour:', { key, value });
         } catch (error) {
           console.error('❌ Erreur updateStat:', error);
           throw error;
@@ -1139,7 +1031,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncRatings();
-          console.log('✅ Évaluation ajoutée:', data);
           return data;
         } catch (error) {
           console.error('❌ Erreur addRating:', error);
@@ -1165,7 +1056,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncPages();
-          console.log('✅ Page créée:', data);
           return data as Page;
         } catch (error) {
           console.error('❌ Erreur createPage:', error);
@@ -1173,9 +1063,10 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // ✅ CORRIGÉ : plus de .select().single() après update()
       updatePage: async (id, page) => {
         try {
-          const { data, error } = await supabase
+          const { error } = await supabase
             .from('pages')
             .update({
               slug: page.slug,
@@ -1183,15 +1074,12 @@ export const useAppStore = create<AppState>()(
               content: page.content,
               updated_at: new Date().toISOString()
             })
-            .eq('id', id)
-            .select()
-            .single();
+            .eq('id', id);
 
           if (error) throw error;
           
           await get().syncPages();
-          console.log('✅ Page mise à jour:', data);
-          return data as Page;
+          return get().pages.find((p) => p.id === id);
         } catch (error) {
           console.error('❌ Erreur updatePage:', error);
           throw error;
@@ -1208,7 +1096,6 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncPages();
-          console.log('✅ Page supprimée');
         } catch (error) {
           console.error('❌ Erreur deletePage:', error);
           throw error;
@@ -1247,7 +1134,6 @@ export const useAppStore = create<AppState>()(
           isAdmin: false
         });
         localStorage.removeItem('soccer-city-store');
-        console.log('🗑️ Store Soccer City réinitialisé');
       },
     }),
     {
@@ -1273,5 +1159,4 @@ export const useAppStore = create<AppState>()(
 if (typeof window !== 'undefined') {
   // @ts-ignore
   window.__STORE = useAppStore;
-  console.log('🔧 Store exposé globalement. Utilisez window.__STORE.getState()');
 }
