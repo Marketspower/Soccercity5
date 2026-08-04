@@ -43,6 +43,24 @@ const sanitizeFieldData = (data: any) => {
   };
 };
 
+
+const mapFieldFromDb = (row: any): Field => ({
+  id: row.id,
+  name: row.name,
+  slug: row.slug,
+  image: row.image_url ?? '',
+  dimensions: row.dimensions,
+  turf: row.turf,
+  lighting: row.lighting,
+  lockerRooms: row.locker_rooms,
+  parking: row.parking,
+  players: row.players,
+  pricePerHour: row.price_per_hour,
+  indoor: row.indoor,
+  active: row.active,
+  created_at: row.created_at,
+});
+
 interface AppState {
   // État
   fields: Field[];
@@ -317,7 +335,7 @@ export const useAppStore = create<AppState>()(
             .order('created_at', { ascending: true });
           
           if (error) throw error;
-          set({ fields: data || [] });
+          set({ fields: (data || []).map(mapFieldFromDb) });
         } catch (error) {
           console.error('❌ Erreur syncFields:', error);
           set({ fields: [] });
@@ -564,7 +582,7 @@ export const useAppStore = create<AppState>()(
           }
           
           await get().syncFields();
-          return data as Field;
+          return mapFieldFromDb(data);
         } catch (error) {
           console.error('❌ Erreur addField:', error);
           throw error;
