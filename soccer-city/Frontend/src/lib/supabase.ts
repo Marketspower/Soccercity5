@@ -40,6 +40,11 @@ if (typeof window !== 'undefined') {
   }
 }
 
+// ✅ Pas de `global.headers` codés en dur ici : le SDK gère automatiquement
+// l'apikey et le token de session courant (anonyme ou connecté) sur chaque
+// requête. Fixer ces headers manuellement écraserait le token de
+// l'utilisateur connecté et provoquerait des 403 RLS sur les opérations
+// protégées (upload, update, etc.).
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
@@ -77,7 +82,10 @@ export const getCurrentUser = async () => {
   }
   
   try {
-    
+    // ✅ CORRIGÉ : on vérifie d'abord qu'une session existe. getSession()
+    // ne lève jamais d'exception, contrairement à getUser() qui lève
+    // AuthSessionMissingError pour un visiteur non connecté. Ça évite un
+    // faux "❌ Erreur" en console pour tout visiteur public du site.
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
 
