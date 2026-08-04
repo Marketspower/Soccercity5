@@ -12,33 +12,55 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { loadUser, isAdmin, isLoading } = useAppStore();
   const [isChecking, setIsChecking] = useState(true);
 
-  // Si on est sur la page de login, on affiche juste le contenu
-  if (pathname === '/admin/login') {
-    return <>{children}</>;
-  }
+  const isLoginPage = pathname === '/admin/login';
 
+  // ✅ CORRIGÉ : tous les hooks (useEffect) sont maintenant appelés
+  // inconditionnellement, à chaque rendu, quel que soit `pathname`.
+  // Avant, le `return <>{children}</>;` pour /admin/login se trouvait
+  // AVANT ces deux useEffect, donc React appelait un nombre différent
+  // de hooks selon la page (violation des Rules of Hooks) — ce qui
+  // provoquait un crash (React error #310) au moment où le même
+  // composant restait monté en passant de /admin/login à /admin après
+  // une connexion réussie. La logique interne est maintenant protégée
+  // par `if (isLoginPage) return;` DANS le useEffect, ce qui est sûr.
   useEffect(() => {
+    if (isLoginPage) {
+      setIsChecking(false);
+      return;
+    }
+
     const checkAccess = async () => {
       await loadUser();
       setIsChecking(false);
-      
-      // Rediriger vers la page de login si l'utilisateur n'est pas admin
-      if (!isAdmin) {
-        router.push('/admin/login');
-      }
     };
-    
-    checkAccess();
-  }, []);
 
-  // Écouter les changements d'authentification
+    checkAccess();
+  }, [isLoginPage]);
+
   useEffect(() => {
+    if (isLoginPage) return;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       loadUser();
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [isLoginPage]);
+
+  // Redirection si l'utilisateur n'est pas admin (une fois la vérification terminée)
+  useEffect(() => {
+    if (isLoginPage) return;
+    if (!isChecking && !isLoading && !isAdmin) {
+      router.push('/admin/login');
+    }
+  }, [isLoginPage, isChecking, isLoading, isAdmin, router]);
+
+  // Si on est sur la page de login, on affiche juste le contenu.
+  // Ce `return` arrive maintenant APRÈS tous les hooks : plus de
+  // violation des Rules of Hooks.
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (isChecking || isLoading) {
     return (
