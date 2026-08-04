@@ -14,15 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isLoginPage = pathname === '/admin/login';
 
-  // ✅ CORRIGÉ : tous les hooks (useEffect) sont maintenant appelés
-  // inconditionnellement, à chaque rendu, quel que soit `pathname`.
-  // Avant, le `return <>{children}</>;` pour /admin/login se trouvait
-  // AVANT ces deux useEffect, donc React appelait un nombre différent
-  // de hooks selon la page (violation des Rules of Hooks) — ce qui
-  // provoquait un crash (React error #310) au moment où le même
-  // composant restait monté en passant de /admin/login à /admin après
-  // une connexion réussie. La logique interne est maintenant protégée
-  // par `if (isLoginPage) return;` DANS le useEffect, ce qui est sûr.
+ 
   useEffect(() => {
     if (isLoginPage) {
       setIsChecking(false);
