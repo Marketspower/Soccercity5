@@ -11,6 +11,12 @@ import { Counter } from "@/components/motion/counter";
 import { useAppStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 
+interface HomepageStats {
+  fields_count: number;
+  reservations_count: number;
+  satisfaction_percent: number;
+}
+
 export function Hero() {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
@@ -20,26 +26,37 @@ export function Hero() {
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "24%"]);
   const fade = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
-  const { stats, loadStats } = useAppStore();
+  const { fields } = useAppStore();
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [posterUrl, setPosterUrl] = useState<string>("");
+  const [homepageStats, setHomepageStats] = useState<HomepageStats | null>(null);
 
   useEffect(() => {
-    loadStats();
-    
+    // ✅ Statistiques réelles en temps réel via une fonction SQL sécurisée
+    // (aucune donnée client individuelle n'est exposée, uniquement des agrégats).
+    const fetchStats = async () => {
+      try {
+        const { data, error } = await supabase.rpc("get_homepage_stats").single();
+        if (error) throw error;
+        setHomepageStats(data as HomepageStats);
+      } catch (error) {
+        console.error("❌ Erreur chargement statistiques:", error);
+      }
+    };
+    fetchStats();
+
     // Récupérer la vidéo depuis Supabase Storage
     const fetchVideo = async () => {
       try {
-        // Récupérer la vidéo depuis la table media
         const { data, error } = await supabase
           .from('media')
           .select('url, thumbnail')
           .eq('type', 'video')
           .eq('is_featured', true)
           .maybeSingle();
-        
+
         if (error) throw error;
-        
+
         if (data) {
           setVideoUrl(data.url);
           if (data.thumbnail) {
@@ -48,24 +65,12 @@ export function Hero() {
         }
       } catch (error) {
         console.error('❌ Erreur chargement vidéo:', error);
-        // Fallback vers une URL par défaut
         setVideoUrl('/videos/hero.mp4');
       }
     };
-    
+
     fetchVideo();
   }, []);
-
-  // Récupérer les valeurs des statistiques
-  const getStatValue = (key: string) => {
-    const stat = stats.find((s) => s.key === key);
-    return stat ? stat.value : 0;
-  };
-
-  const getStatSuffix = (key: string) => {
-    const stat = stats.find((s) => s.key === key);
-    return stat ? stat.suffix : "";
-  };
 
   return (
     <section
@@ -215,7 +220,7 @@ export function Hero() {
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Terrains</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter value={getStatValue("terrains")} />
+              <Counter value={fields.length} />
             </dd>
             <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">
               Terrains
@@ -224,10 +229,7 @@ export function Hero() {
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Matchs</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter
-                value={getStatValue("matchs_joues")}
-                suffix={getStatSuffix("matchs_joues")}
-              />
+              <Counter value={homepageStats?.reservations_count ?? 0} />
             </dd>
             <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">
               Matchs joués
@@ -236,25 +238,20 @@ export function Hero() {
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Satisfaction</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter
-                value={getStatValue("satisfaction")}
-                suffix={getStatSuffix("satisfaction")}
-              />
+              <Counter value={homepageStats?.satisfaction_percent ?? 0} suffix="%" />
             </dd>
             <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">
               Satisfaction
             </p>
           </div>
-          <div className="bg-white/[0.02] p-5 text-center sm:p-6">
-            <dt className="sr-only">Expérience</dt>
+          {/* ✅ Remplace "Années d'expérience" — vrai dès le premier jour, pas de maintenance requise */}
+          <div className="bg-white/[0.02] p-5 text-center sm:p-6 flex flex-col items-center justify-center">
+            <dt className="sr-only">Disponibilité</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
-              <Counter
-                value={getStatValue("annees_experience")}
-                suffix={getStatSuffix("annees_experience")}
-              />
+              7j/7
             </dd>
             <p className="mt-1 text-[11px] uppercase tracking-widest text-white/50">
-              Années
+              Ouvert
             </p>
           </div>
         </motion.dl>
