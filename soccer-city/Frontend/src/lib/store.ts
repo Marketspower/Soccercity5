@@ -13,7 +13,6 @@ import type {
   ReservationStatus, 
   EventStatus,
   PricingPlan,
-  Stat,
   Rating,
   GalleryImage,
   MediaItem,
@@ -25,7 +24,7 @@ import type {
 // API Backend URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-// ✅ Fonction utilitaire pour nettoyer les données des terrains
+// Fonction utilitaire pour nettoyer les données des terrains
 const sanitizeFieldData = (data: any) => {
   return {
     name: data.name?.trim(),
@@ -42,7 +41,6 @@ const sanitizeFieldData = (data: any) => {
     active: data.active ?? true,
   };
 };
-
 
 const mapFieldFromDb = (row: any): Field => ({
   id: row.id,
@@ -71,7 +69,6 @@ interface AppState {
   blocked: BlockedSlot[];
   notifications: AppNotification[];
   pricing: PricingPlan[];
-  stats: Stat[];
   ratings: Rating[];
   pages: Page[];
   isLoading: boolean;
@@ -94,7 +91,6 @@ interface AppState {
   syncEvents: () => Promise<void>;
   syncBlocked: () => Promise<void>;
   syncPricing: () => Promise<void>;
-  syncStats: () => Promise<void>;
   syncRatings: () => Promise<void>;
   syncPages: () => Promise<void>;
   syncNotifications: () => Promise<void>;
@@ -103,7 +99,6 @@ interface AppState {
   loadFields: () => Promise<void>;
   loadGallery: () => Promise<void>;
   loadMedia: () => Promise<void>;
-  loadStats: () => Promise<void>;
   loadRatings: () => Promise<void>;
   loadReservations: () => Promise<void>;
   loadPages: () => Promise<void>;
@@ -142,8 +137,7 @@ interface AppState {
   // Notifications
   sendNotification: (n: Omit<AppNotification, "id" | "sentAt">) => Promise<AppNotification>;
 
-  // Stats & Ratings
-  updateStat: (key: string, value: number) => Promise<void>;
+  // Évaluations
   addRating: (rating: number, comment?: string) => Promise<void>;
 
   // Pages CMS
@@ -172,7 +166,6 @@ export const useAppStore = create<AppState>()(
       blocked: [],
       notifications: [],
       pricing: [],
-      stats: [],
       ratings: [],
       pages: [],
       isLoading: false,
@@ -207,7 +200,6 @@ export const useAppStore = create<AppState>()(
         try {
           await get().loadUser();
 
-          // Charger toutes les données depuis le backend
           await Promise.all([
             get().syncFields(),
             get().syncGallery(),
@@ -216,13 +208,11 @@ export const useAppStore = create<AppState>()(
             get().syncEvents(),
             get().syncBlocked(),
             get().syncPricing(),
-            get().syncStats(),
             get().syncRatings(),
             get().syncPages(),
             get().syncNotifications()
           ]);
 
-          // Configurer la synchronisation en temps réel
           get().setupRealtime();
 
           set({ isInitialized: true, isLoading: false });
@@ -290,13 +280,6 @@ export const useAppStore = create<AppState>()(
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'pricing' }, 
             () => { get().syncPricing(); })
-          .subscribe();
-
-        supabase
-          .channel('stats-changes')
-          .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'stats' }, 
-            () => { get().syncStats(); })
           .subscribe();
 
         supabase
@@ -452,20 +435,6 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      syncStats: async () => {
-        try {
-          const { data, error } = await supabase
-            .from('stats')
-            .select('*');
-          
-          if (error) throw error;
-          set({ stats: data || [] });
-        } catch (error) {
-          console.error('❌ Erreur syncStats:', error);
-          set({ stats: [] });
-        }
-      },
-
       syncRatings: async () => {
         try {
           const { data, error } = await supabase
@@ -517,7 +486,6 @@ export const useAppStore = create<AppState>()(
       loadFields: async () => get().syncFields(),
       loadGallery: async () => get().syncGallery(),
       loadMedia: async () => get().syncMedia(),
-      loadStats: async () => get().syncStats(),
       loadRatings: async () => get().syncRatings(),
       loadReservations: async () => get().syncReservations(),
       loadPages: async () => get().syncPages(),
@@ -589,8 +557,6 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      // ✅ CORRIGÉ : plus de .select().single() après update() (source du 406).
-      // On fait juste l'update, puis on resynchronise et on relit depuis le state local.
       updateField: async (id, patch) => {
         try {
           const updateData: any = {};
@@ -677,7 +643,6 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      // ✅ CORRIGÉ : plus de .select().single() après update()
       updateGalleryImage: async (id, data) => {
         try {
           const { error } = await supabase
@@ -790,7 +755,6 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      // ✅ CORRIGÉ : plus de .select().single() après update()
       updateMediaItem: async (id, data) => {
         try {
           const { error } = await supabase
@@ -1021,24 +985,6 @@ export const useAppStore = create<AppState>()(
       },
 
       // ============================================
-      // STATISTIQUES
-      // ============================================
-      updateStat: async (key: string, value: number) => {
-        try {
-          const { error } = await supabase
-            .from('stats')
-            .update({ value })
-            .eq('key', key);
-
-          if (error) throw error;
-          await get().syncStats();
-        } catch (error) {
-          console.error('❌ Erreur updateStat:', error);
-          throw error;
-        }
-      },
-
-      // ============================================
       // ÉVALUATIONS
       // ============================================
       addRating: async (rating: number, comment?: string) => {
@@ -1087,7 +1033,6 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      // ✅ CORRIGÉ : plus de .select().single() après update()
       updatePage: async (id, page) => {
         try {
           const { error } = await supabase
@@ -1149,7 +1094,6 @@ export const useAppStore = create<AppState>()(
           blocked: [],
           notifications: [],
           pricing: [],
-          stats: [],
           ratings: [],
           pages: [],
           isLoading: false,
@@ -1173,7 +1117,6 @@ export const useAppStore = create<AppState>()(
         blocked: state.blocked,
         notifications: state.notifications,
         pricing: state.pricing,
-        stats: state.stats,
         ratings: state.ratings,
         pages: state.pages
       })
