@@ -59,6 +59,31 @@ const mapFieldFromDb = (row: any): Field => ({
   created_at: row.created_at,
 });
 
+// ✅ Mapping snake_case (Supabase) → camelCase pour les réservations
+const mapReservationFromDb = (row: any): Reservation => ({
+  id: row.id,
+  userId: row.user_id,
+  userName: row.user_name,
+  userEmail: row.user_email,
+  userPhone: row.user_phone,
+  date: row.date,
+  startTime: row.start_time,
+  endTime: row.end_time,
+  price: row.price,
+  status: row.status,
+  createdAt: row.created_at,
+});
+
+// ✅ Mapping snake_case (Supabase) → camelCase pour les créneaux bloqués
+const mapBlockedFromDb = (row: any): BlockedSlot => ({
+  id: row.id,
+  date: row.date,
+  startTime: row.start_time,
+  endTime: row.end_time,
+  blocked: row.blocked,
+  reason: row.reason,
+});
+
 interface AppState {
   // État
   fields: Field[];
@@ -122,16 +147,16 @@ interface AppState {
   // Upload
   uploadImage: (file: File, folder?: string) => Promise<string>;
 
-  // Réservations
-  addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status">) => Promise<Reservation>;
+  // Réservations — ✅ userId retiré (jamais réellement inséré en base) et hour → startTime/endTime
+  addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status" | "userId">) => Promise<Reservation>;
   setReservationStatus: (id: string, status: ReservationStatus) => Promise<void>;
 
   // Événements
   addEvent: (e: Omit<PrivateEvent, "id" | "createdAt" | "status" | "media" | "gallery">) => Promise<PrivateEvent>;
   setEventStatus: (id: string, status: EventStatus) => Promise<void>;
 
-  // Disponibilités
-  blockSlot: (date: string, hour: number, reason: string) => Promise<BlockedSlot>;
+  // Disponibilités — ✅ hour → startTime/endTime
+  blockSlot: (date: string, startTime: string, endTime: string, reason: string) => Promise<BlockedSlot>;
   unblockSlot: (id: string) => Promise<void>;
 
   // Notifications
@@ -371,6 +396,7 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // ✅ Mapping snake_case → camelCase appliqué (start_time/end_time → startTime/endTime)
       syncReservations: async () => {
         try {
           const { data, error } = await supabase
@@ -379,7 +405,7 @@ export const useAppStore = create<AppState>()(
             .order('created_at', { ascending: false });
           
           if (error) throw error;
-          set({ reservations: data || [] });
+          set({ reservations: (data || []).map(mapReservationFromDb) });
         } catch (error) {
           console.error('❌ Erreur syncReservations:', error);
           set({ reservations: [] });
@@ -405,6 +431,7 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // ✅ Mapping snake_case → camelCase appliqué
       syncBlocked: async () => {
         try {
           const { data, error } = await supabase
@@ -413,7 +440,7 @@ export const useAppStore = create<AppState>()(
             .order('date', { ascending: true });
           
           if (error) throw error;
-          set({ blocked: data || [] });
+          set({ blocked: (data || []).map(mapBlockedFromDb) });
         } catch (error) {
           console.error('❌ Erreur syncBlocked:', error);
           set({ blocked: [] });
@@ -826,7 +853,7 @@ export const useAppStore = create<AppState>()(
       },
 
       // ============================================
-      // RÉSERVATIONS
+      // RÉSERVATIONS — ✅ startTime/endTime au lieu de hour
       // ============================================
       addReservation: async (r) => {
         try {
@@ -837,7 +864,8 @@ export const useAppStore = create<AppState>()(
               user_email: r.userEmail,
               user_phone: r.userPhone,
               date: r.date,
-              hour: r.hour,
+              start_time: r.startTime,
+              end_time: r.endTime,
               price: r.price,
               status: 'confirmed'
             }])
@@ -847,7 +875,7 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncReservations();
-          return data as Reservation;
+          return mapReservationFromDb(data);
         } catch (error) {
           console.error('❌ Erreur addReservation:', error);
           throw error;
@@ -917,15 +945,16 @@ export const useAppStore = create<AppState>()(
       },
 
       // ============================================
-      // DISPONIBILITÉS
+      // DISPONIBILITÉS — ✅ startTime/endTime au lieu de hour
       // ============================================
-      blockSlot: async (date, hour, reason) => {
+      blockSlot: async (date, startTime, endTime, reason) => {
         try {
           const { data, error } = await supabase
             .from('availability')
             .insert([{
               date: date,
-              hour: hour,
+              start_time: startTime,
+              end_time: endTime,
               blocked: true,
               reason: reason || 'Bloqué par l\'administration'
             }])
@@ -935,7 +964,7 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncBlocked();
-          return data as BlockedSlot;
+          return mapBlockedFromDb(data);
         } catch (error) {
           console.error('❌ Erreur blockSlot:', error);
           throw error;

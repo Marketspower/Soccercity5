@@ -3,42 +3,47 @@
 
 import { supabase } from "./supabase";
 import { useAppStore } from "./store";
-import { HOURS, slotLabel, toISODate } from "./utils";
-import type { Slot, EventType, GalleryImage, MediaItem, Reservation } from "./types";
+import { toISODate } from "./utils";
+import type { EventType, GalleryImage, MediaItem } from "./types";
 
 // ============================================
-// SLOTS - Récupération des créneaux disponibles
+// CRÉNEAUX RÉSERVÉS/BLOQUÉS — pour vérifier les chevauchements
 // ============================================
 
-export async function fetchSlots(date: Date): Promise<Slot[]> {
-  const { reservations, blocked } = useAppStore.getState();
+export async function fetchBookedRanges(
+  date: Date
+): Promise<{ startTime: string; endTime: string }[]> {
   const iso = toISODate(date);
-  const now = new Date();
 
-  // Récupérer toutes les réservations pour la date
-  const dayReservations = reservations.filter(
-    (r) => r.date === iso && r.status !== "cancelled"
-  );
+  const { data: reservationsData, error: reservationsError } = await supabase
+    .from("reservations")
+    .select("start_time, end_time")
+    .eq("date", iso)
+    .neq("status", "cancelled");
 
-  const dayBlocks = blocked.filter(
-    (b) => b.date === iso
-  );
+  if (reservationsError) {
+    console.error("❌ Erreur fetchBookedRanges (reservations):", reservationsError);
+  }
 
-  return HOURS.map((hour) => {
-    const isPast = 
-      (date.toDateString() === now.toDateString() && hour <= now.getHours()) ||
-      date < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const { data: blockedData, error: blockedError } = await supabase
+    .from("availability")
+    .select("start_time, end_time")
+    .eq("date", iso);
 
-    const isReserved = dayReservations.some((r) => r.hour === hour);
-    const isBlocked = dayBlocks.some((b) => b.hour === hour);
+  if (blockedError) {
+    console.error("❌ Erreur fetchBookedRanges (availability):", blockedError);
+  }
 
-    let state: Slot["state"] = "free";
-    if (isPast) state = "past";
-    else if (isBlocked) state = "blocked";
-    else if (isReserved) state = "taken";
+  const reservationRanges = (reservationsData || []).map((r) => ({
+    startTime: r.start_time as string,
+    endTime: r.end_time as string,
+  }));
+  const blockedRanges = (blockedData || []).map((b) => ({
+    startTime: b.start_time as string,
+    endTime: b.end_time as string,
+  }));
 
-    return { hour, label: slotLabel(hour), state };
-  });
+  return [...reservationRanges, ...blockedRanges];
 }
 
 // ============================================
@@ -47,35 +52,36 @@ export async function fetchSlots(date: Date): Promise<Slot[]> {
 
 export async function createReservation(input: {
   date: string;
-  hour: number;
+  startTime: string;
+  endTime: string;
   price: number;
   userName: string;
   userEmail: string;
   userPhone: string;
 }) {
-  // Vérifier si le créneau est déjà réservé
+  // Vérifier qu'aucune réservation existante ne chevauche ce créneau
   const { data: existing } = await supabase
     .from('reservations')
     .select('id')
     .eq('date', input.date)
-    .eq('hour', input.hour)
-    .neq('status', 'cancelled');
+    .neq('status', 'cancelled')
+    .lt('start_time', input.endTime)
+    .gt('end_time', input.startTime);
 
   if (existing && existing.length > 0) {
-    throw new Error('Ce créneau est déjà réservé');
+    throw new Error('Ce créneau chevauche une réservation existante');
   }
 
-  // Créer la réservation avec userId null (car pas d'utilisateur connecté)
   const reservation = await useAppStore.getState().addReservation({
-    userId: null, // Ajouter userId null
     userName: input.userName,
     userEmail: input.userEmail,
     userPhone: input.userPhone,
     date: input.date,
-    hour: input.hour,
+    startTime: input.startTime,
+    endTime: input.endTime,
     price: input.price,
   });
-  
+
   await supabase.channel('reservations-changes').send({
     type: 'broadcast',
     event: 'new_reservation',

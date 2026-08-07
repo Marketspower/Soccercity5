@@ -6,22 +6,30 @@ import { useAppStore } from "@/lib/store";
 import { toISODate } from "@/lib/utils";
 import type { Field } from "@/lib/types";
 import { DatePicker } from "./date-picker";
-import { SlotGrid } from "./slot-grid";
+import { TimeRangePicker, type TimeRangeValue } from "./time-range-picker";
+import { computeDurationHours, formatDuration } from "@/lib/time-utils";
 
 export function BookingFlow() {
   const { fields } = useAppStore();
   const [step, setStep] = useState(0);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [date, setDate] = useState<Date>(startOfToday());
-  const [hour, setHour] = useState<number | null>(null);
+  const [range, setRange] = useState<TimeRangeValue>({ startTime: null, endTime: null });
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const selectedField = fields.find((f: Field) => f.id === selectedFieldId);
 
+  const price =
+    selectedField && range.startTime && range.endTime
+      ? Math.round(
+          computeDurationHours(range.startTime, range.endTime) * selectedField.pricePerHour * 100
+        ) / 100
+      : 0;
+
   const handlePay = async () => {
-    if (!selectedField || hour === null) return;
+    if (!selectedField || !range.startTime || !range.endTime) return;
     if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
       setError("Veuillez remplir tous les champs.");
       return;
@@ -36,8 +44,9 @@ export function BookingFlow() {
           fieldId: selectedField.id,
           fieldName: selectedField.name,
           date: toISODate(date),
-          hour,
-          price: selectedField.pricePerHour,
+          startTime: range.startTime,
+          endTime: range.endTime,
+          price,
           userName: form.name,
           userEmail: form.email,
           userPhone: form.phone,
@@ -64,7 +73,7 @@ export function BookingFlow() {
               type="button"
               onClick={() => {
                 setSelectedFieldId(f.id);
-                setHour(null);
+                setRange({ startTime: null, endTime: null });
                 setStep(1);
               }}
               className="group overflow-hidden rounded-lg border bg-card text-left transition-all hover:shadow-glow-sm"
@@ -83,7 +92,7 @@ export function BookingFlow() {
     );
   }
 
-  // Étape 1 : choix de la date et de l'heure
+  // Étape 1 : choix de la date et de l'horaire (libre, avec minutes)
   if (step === 1 && selectedField) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -91,28 +100,28 @@ export function BookingFlow() {
           ← Changer de terrain
         </button>
         <h2 className="text-2xl font-bold mb-2">{selectedField.name}</h2>
-        <p className="text-muted-foreground mb-6">Choisissez une date et une heure</p>
+        <p className="text-muted-foreground mb-6">Choisissez une date et un horaire</p>
 
         <DatePicker
           value={date}
           onChange={(d) => {
             setDate(d);
-            setHour(null);
+            setRange({ startTime: null, endTime: null });
           }}
         />
 
         <div className="mt-6">
-          <SlotGrid
-            fieldId={selectedField.id}
+          <TimeRangePicker
             date={date}
-            selected={hour}
-            onSelect={setHour}
+            pricePerHour={selectedField.pricePerHour}
+            value={range}
+            onChange={setRange}
           />
         </div>
 
         <button
           type="button"
-          disabled={hour === null}
+          disabled={!range.startTime || !range.endTime}
           onClick={() => setStep(2)}
           className="mt-8 w-full rounded-md bg-primary py-3 font-bold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -123,7 +132,7 @@ export function BookingFlow() {
   }
 
   // Étape 2 : coordonnées et paiement
-  if (step === 2 && selectedField && hour !== null) {
+  if (step === 2 && selectedField && range.startTime && range.endTime) {
     return (
       <div className="mx-auto max-w-md">
         <button onClick={() => setStep(1)} className="mb-4 text-sm text-primary hover:underline">
@@ -131,7 +140,8 @@ export function BookingFlow() {
         </button>
         <h2 className="text-2xl font-bold mb-2">Vos coordonnées</h2>
         <p className="text-muted-foreground mb-6">
-          {selectedField.name} · {toISODate(date)} à {hour}h · {selectedField.pricePerHour} $
+          {selectedField.name} · {toISODate(date)} · {range.startTime} - {range.endTime} (
+          {formatDuration(range.startTime, range.endTime)}) · {price.toFixed(2)} $
         </p>
 
         <div className="space-y-4">
@@ -166,7 +176,7 @@ export function BookingFlow() {
           disabled={loading}
           className="mt-6 w-full rounded-md bg-primary py-3 font-bold text-white transition-opacity disabled:opacity-60"
         >
-          {loading ? "Redirection vers le paiement…" : `Payer ${selectedField.pricePerHour} $`}
+          {loading ? "Redirection vers le paiement…" : `Payer ${price.toFixed(2)} $`}
         </button>
       </div>
     );

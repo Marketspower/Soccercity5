@@ -73,6 +73,7 @@ export interface Field {
 
 export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
+// ✅ `hour` (créneau fixe) remplacé par `startTime`/`endTime` (format "HH:MM")
 export interface Reservation {
   id: string;
   userId: string | null;
@@ -80,7 +81,8 @@ export interface Reservation {
   userEmail: string;
   userPhone: string;
   date: string;
-  hour: number;
+  startTime: string;
+  endTime: string;
   price: number;
   status: ReservationStatus;
   createdAt: string;
@@ -107,10 +109,12 @@ export interface PrivateEvent {
   gallery: GalleryImage[];
 }
 
+// ✅ `hour` remplacé par `startTime`/`endTime`
 export interface BlockedSlot {
   id: string;
   date: string;
-  hour: number;
+  startTime: string;
+  endTime: string;
   blocked: boolean;
   reason: string | null;
 }
@@ -132,23 +136,6 @@ export interface AppNotification {
   audience: "all" | "clients" | "admins";
   sentById: string | null;
   sentAt: string;
-}
-
-export type SlotState = "free" | "taken" | "blocked" | "past";
-
-export interface Slot {
-  hour: number;
-  label: string;
-  state: SlotState;
-}
-
-export interface Stat {
-  id: string;
-  key: string;
-  value: number;
-  label: string;
-  suffix: string;
-  updated_at: string;
 }
 
 export interface Rating {
