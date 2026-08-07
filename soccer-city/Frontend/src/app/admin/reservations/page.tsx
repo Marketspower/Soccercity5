@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { useAppStore } from "@/lib/store";
-import { formatCAD, slotLabel } from "@/lib/utils";
+import { formatCAD } from "@/lib/utils";
 import type { ReservationStatus } from "@/lib/types";
 
 const STATUS_LABEL: Record<ReservationStatus, string> = {
@@ -68,7 +68,7 @@ export default function AdminReservations() {
               {rows.map((r) => (
                 <tr key={r.id} className="border-b transition-colors last:border-0 hover:bg-accent/40">
                   <td className="px-4 py-3 tabular-nums">{r.date}</td>
-                  <td className="px-4 py-3 tabular-nums">{slotLabel(r.hour)}</td>
+                  <td className="px-4 py-3 tabular-nums">{r.startTime} - {r.endTime}</td>
                   <td className="px-4 py-3 font-medium">{r.userName}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {r.userEmail}<br />{r.userPhone}
