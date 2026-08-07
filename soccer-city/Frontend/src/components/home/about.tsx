@@ -40,10 +40,10 @@ export function About() {
           </Reveal>
           <Reveal delay={0.15}>
             <p className="mt-6 leading-relaxed text-muted-foreground">
-              Depuis 8 ans, Soccer City réunit les joueurs de tous les niveaux autour d&apos;une
-              même exigence : offrir des conditions de jeu professionnelles, accessibles à tous,
-              tous les jours. Ligues entre amis, entraînements de clubs, tournois d&apos;entreprise
-              ou anniversaires — le complexe s&apos;adapte à votre match.
+             Soccer City réunit les joueurs de tous les niveaux autour d'une même exigence : 
+              offrir des conditions de jeu professionnelles, accessibles à tous, tous les jours. 
+              Anniversaires, tournois, activités d'entreprise, sorties scolaires, événements privés
+              ou compétitions — le complexe s'adapte à votre match.
             </p>
           </Reveal>
           <Reveal delay={0.25}>
