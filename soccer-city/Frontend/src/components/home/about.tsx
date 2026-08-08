@@ -43,7 +43,7 @@ export function About() {
              Soccer City réunit les joueurs de tous les niveaux autour d'une même exigence : 
               offrir des conditions de jeu professionnelles, accessibles à tous, tous les jours. 
               Anniversaires, tournois, activités d'entreprise, sorties scolaires, événements privés
-              ou compétitions — le complexe s'adapte à votre match.
+              ou compétitions — le complexe s'adapte à vos besoins.
             </p>
           </Reveal>
           <Reveal delay={0.25}>
