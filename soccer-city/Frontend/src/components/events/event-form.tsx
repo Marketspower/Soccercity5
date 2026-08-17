@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Check, Send } from "lucide-react";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DateCalendar } from "@/components/ui/date-calendar";
 import { createPrivateEvent } from "@/lib/api";
 import type { EventType } from "@/lib/types";
 
@@ -49,11 +50,13 @@ export function EventForm({ selectedType }: EventFormProps) {
     register,
     handleSubmit,
     setValue,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       type: selectedType,
+      date: "",
     },
   });
   useEffect(() => {
@@ -155,11 +158,16 @@ export function EventForm({ selectedType }: EventFormProps) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="e-date">Date souhaitée</Label>
-          <Input
-            id="e-date"
-            type="date"
-            min={new Date().toISOString().split("T")[0]}
-            {...register("date")}
+          <Controller
+            name="date"
+            control={control}
+            render={({ field }) => (
+              <DateCalendar
+                value={field.value}
+                onChange={field.onChange}
+                error={!!errors.date}
+              />
+            )}
           />
           {errors.date && (
             <p className="text-xs text-destructive">{errors.date.message}</p>
