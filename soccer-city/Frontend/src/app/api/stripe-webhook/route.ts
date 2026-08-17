@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { sendReservationConfirmationEmail, sendAdminNotificationEmail } from "@/lib/email";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-07-29.dahlia",
@@ -53,7 +54,8 @@ export async function POST(req: NextRequest) {
           user_email: metadata.userEmail,
           user_phone: metadata.userPhone,
           date: metadata.date,
-          hour: Number(metadata.hour),
+          start_time: metadata.startTime,
+          end_time: metadata.endTime,
           price: Number(metadata.price),
           status: "confirmed",
         })
@@ -77,12 +79,30 @@ export async function POST(req: NextRequest) {
           user_email: metadata.userEmail,
           user_phone: metadata.userPhone,
           date: metadata.date,
-          hour: Number(metadata.hour),
         });
 
       if (paymentError) throw paymentError;
 
       console.log("✅ Réservation et paiement enregistrés:", reservation.id);
+
+      // 3. Envoyer les courriels (client + notification admin).
+      // On ne bloque jamais la réponse du webhook sur l'envoi des courriels :
+      // les erreurs d'envoi sont gérées et loggées à l'intérieur de ces fonctions.
+      const emailParams = {
+        userName: metadata.userName,
+        userEmail: metadata.userEmail,
+        userPhone: metadata.userPhone,
+        fieldName: metadata.fieldName,
+        date: metadata.date,
+        startTime: metadata.startTime,
+        endTime: metadata.endTime,
+        price: Number(metadata.price),
+      };
+
+      await Promise.all([
+        sendReservationConfirmationEmail(emailParams),
+        sendAdminNotificationEmail(emailParams),
+      ]);
     } catch (error) {
       console.error("❌ Erreur enregistrement réservation/paiement:", error);
       return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
