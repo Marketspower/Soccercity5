@@ -145,7 +145,7 @@ interface AppState {
   deleteMediaItem: (id: string) => Promise<void>;
 
   // Upload
-  uploadImage: (file: File, folder?: string) => Promise<string>;
+  uploadImage: (file: File, folder?: string, bucket?: string) => Promise<string>;
 
   // Réservations — ✅ userId retiré (jamais réellement inséré en base) et hour → startTime/endTime
   addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status" | "userId">) => Promise<Reservation>;
@@ -518,18 +518,28 @@ export const useAppStore = create<AppState>()(
       loadPages: async () => get().syncPages(),
 
       // ============================================
-      // UPLOAD D'IMAGES
+      // UPLOAD (images + médias vidéo/audio)
       // ============================================
-      uploadImage: async (file: File, folder: string = 'gallery') => {
+      uploadImage: async (file: File, folder: string = 'gallery', bucket: string = 'images') => {
         set({ uploading: true });
         try {
-          const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+          const allowedTypesByBucket: Record<string, string[]> = {
+            images: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
+            media: [
+              'image/jpeg', 'image/png', 'image/webp',
+              'video/mp4', 'video/webm', 'video/quicktime',
+              'audio/mpeg', 'audio/wav', 'audio/ogg',
+            ],
+          };
+          const allowedTypes = allowedTypesByBucket[bucket] || allowedTypesByBucket.images;
+
           if (!allowedTypes.includes(file.type)) {
-            throw new Error('Format non supporté. Utilisez JPG, PNG, WEBP ou SVG.');
+            throw new Error('Format non supporté pour ce type de fichier.');
           }
 
-          if (file.size > 5 * 1024 * 1024) {
-            throw new Error('Fichier trop volumineux (max 5MB)');
+          const maxSize = bucket === 'media' ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
+          if (file.size > maxSize) {
+            throw new Error(`Fichier trop volumineux (max ${Math.round(maxSize / (1024 * 1024))}MB)`);
           }
 
           const fileExt = file.name.split('.').pop();
@@ -537,7 +547,7 @@ export const useAppStore = create<AppState>()(
           const filePath = `${folder}/${fileName}`;
 
           const { data, error } = await supabase.storage
-            .from('images')
+            .from(bucket)
             .upload(filePath, file, {
               cacheControl: '3600',
               upsert: false
@@ -546,7 +556,7 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
 
           const { data: publicUrl } = supabase.storage
-            .from('images')
+            .from(bucket)
             .getPublicUrl(filePath);
 
           set({ uploading: false });
