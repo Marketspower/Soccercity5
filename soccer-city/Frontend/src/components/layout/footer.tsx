@@ -83,7 +83,7 @@ export function Footer() {
 
         <div className="mt-12 pt-6 border-t border-white/5 flex flex-col items-center justify-between gap-3 text-xs text-white/30 sm:flex-row">
           <p>© {new Date().getFullYear()} Soccer City. Tous droits réservés.</p>
-          <p>2450 boulevard des Sports, Saint-Constant, QC J5A 2G7</p>
+          <p>835 rue Saint-Jacques, Saint-Jean-sur-Richelieu, QC</p>
         </div>
       </div>
     </footer>
