@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Facebook, Instagram, Youtube, Mail, MapPin, Phone } from "lucide-react";
+import { Facebook, Instagram, Mail, MapPin, Phone } from "lucide-react";
 
 const NAV = [
   { title: "Explorer", links: [
@@ -26,9 +26,8 @@ const NAV = [
 ];
 
 const SOCIALS = [
-  { href: "https://instagram.com", label: "Instagram", Icon: Instagram },
-  { href: "https://facebook.com", label: "Facebook", Icon: Facebook },
-  { href: "https://youtube.com", label: "YouTube", Icon: Youtube },
+  { href: "https://www.instagram.com/soccercity5.montreal", label: "Instagram", Icon: Instagram },
+  { href: "https://m.facebook.com/story.php?story_fbid=pfbid0Yq9K5wDTjBqGkmGituKdxyRpzqHQqRSLLBeCoeZRsgb5oCE4eQ1ftqzQgY9PokQJl&id=61592598695737", label: "Facebook", Icon: Facebook },
 ];
 
 export function Footer() {
