@@ -8,13 +8,32 @@ import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { useAppStore } from "@/lib/store";
 import { formatCAD } from "@/lib/utils";
-import type { ReservationStatus } from "@/lib/types";
+import type { Reservation, ReservationStatus } from "@/lib/types";
 
 const STATUS_LABEL: Record<ReservationStatus, string> = {
   pending: "En attente",
   confirmed: "Confirmée",
   cancelled: "Annulée",
 };
+
+// ✅ Réservation multi-jours si endDate est renseigné et différent de date
+function isMultiDay(r: Reservation) {
+  return !!r.endDate && r.endDate !== r.date;
+}
+
+function formatDateCell(r: Reservation) {
+  if (isMultiDay(r)) {
+    return `${r.date} → ${r.endDate}`;
+  }
+  return r.date;
+}
+
+function formatSlotCell(r: Reservation) {
+  if (isMultiDay(r)) {
+    return `${r.startTime} → ${r.endTime}`;
+  }
+  return `${r.startTime} - ${r.endTime}`;
+}
 
 export default function AdminReservations() {
   const { reservations, setReservationStatus } = useAppStore();
@@ -67,8 +86,15 @@ export default function AdminReservations() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b transition-colors last:border-0 hover:bg-accent/40">
-                  <td className="px-4 py-3 tabular-nums">{r.date}</td>
-                  <td className="px-4 py-3 tabular-nums">{r.startTime} - {r.endTime}</td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {formatDateCell(r)}
+                    {isMultiDay(r) && (
+                      <span className="ml-2 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                        Plusieurs jours
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums">{formatSlotCell(r)}</td>
                   <td className="px-4 py-3 font-medium">{r.userName}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {r.userEmail}<br />{r.userPhone}

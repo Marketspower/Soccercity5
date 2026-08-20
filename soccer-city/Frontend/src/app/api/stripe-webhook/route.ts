@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      // 1. Créer la réservation
+      // 1. Créer la réservation (end_date renseigné uniquement si multi-jours)
       const { data: reservation, error: reservationError } = await supabaseAdmin
         .from("reservations")
         .insert({
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
           date: metadata.date,
           start_time: metadata.startTime,
           end_time: metadata.endTime,
+          end_date: metadata.endDate || null,
           price: Number(metadata.price),
           status: "confirmed",
         })
@@ -85,9 +86,7 @@ export async function POST(req: NextRequest) {
 
       console.log("✅ Réservation et paiement enregistrés:", reservation.id);
 
-      // 3. Envoyer les courriels (client + notification admin).
-      // On ne bloque jamais la réponse du webhook sur l'envoi des courriels :
-      // les erreurs d'envoi sont gérées et loggées à l'intérieur de ces fonctions.
+      // 3. Envoyer les courriels (client + notification admin)
       const emailParams = {
         userName: metadata.userName,
         userEmail: metadata.userEmail,

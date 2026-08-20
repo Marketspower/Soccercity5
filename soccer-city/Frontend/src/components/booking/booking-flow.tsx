@@ -7,29 +7,51 @@ import { toISODate } from "@/lib/utils";
 import type { Field } from "@/lib/types";
 import { DatePicker } from "./date-picker";
 import { TimeRangePicker, type TimeRangeValue } from "./time-range-picker";
-import { computeDurationHours, formatDuration } from "@/lib/time-utils";
+import { MultiDayPicker, type MultiDayValue } from "./multi-day-picker";
+import { computeDurationHours, formatDuration, computeSpanHours, formatSpanDuration } from "@/lib/time-utils";
+
+type Mode = "single" | "multi";
 
 export function BookingFlow() {
   const { fields } = useAppStore();
   const [step, setStep] = useState(0);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>("single");
+
+  // Mode 1 jour
   const [date, setDate] = useState<Date>(startOfToday());
   const [range, setRange] = useState<TimeRangeValue>({ startTime: null, endTime: null });
+
+  // Mode plusieurs jours
+  const [multiDay, setMultiDay] = useState<MultiDayValue>({
+    startDate: null, startTime: null, endDate: null, endTime: null,
+  });
+
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const selectedField = fields.find((f: Field) => f.id === selectedFieldId);
 
-  const price =
-    selectedField && range.startTime && range.endTime
-      ? Math.round(
-          computeDurationHours(range.startTime, range.endTime) * selectedField.pricePerHour * 100
-        ) / 100
-      : 0;
+  const isReady =
+    mode === "single"
+      ? !!range.startTime && !!range.endTime
+      : !!multiDay.startDate && !!multiDay.startTime && !!multiDay.endDate && !!multiDay.endTime;
+
+  const price = (() => {
+    if (!selectedField) return 0;
+    if (mode === "single" && range.startTime && range.endTime) {
+      return Math.round(computeDurationHours(range.startTime, range.endTime) * selectedField.pricePerHour * 100) / 100;
+    }
+    if (mode === "multi" && multiDay.startDate && multiDay.startTime && multiDay.endDate && multiDay.endTime) {
+      const hours = computeSpanHours(multiDay.startDate, multiDay.startTime, multiDay.endDate, multiDay.endTime);
+      return hours > 0 ? Math.round(hours * selectedField.pricePerHour * 100) / 100 : 0;
+    }
+    return 0;
+  })();
 
   const handlePay = async () => {
-    if (!selectedField || !range.startTime || !range.endTime) return;
+    if (!selectedField || !isReady || price <= 0) return;
     if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
       setError("Veuillez remplir tous les champs.");
       return;
@@ -37,20 +59,36 @@ export function BookingFlow() {
     setLoading(true);
     setError("");
     try {
+      const payload =
+        mode === "single"
+          ? {
+              fieldId: selectedField.id,
+              fieldName: selectedField.name,
+              date: toISODate(date),
+              startTime: range.startTime,
+              endTime: range.endTime,
+              price,
+              userName: form.name,
+              userEmail: form.email,
+              userPhone: form.phone,
+            }
+          : {
+              fieldId: selectedField.id,
+              fieldName: selectedField.name,
+              date: multiDay.startDate,
+              startTime: multiDay.startTime,
+              endDate: multiDay.endDate,
+              endTime: multiDay.endTime,
+              price,
+              userName: form.name,
+              userEmail: form.email,
+              userPhone: form.phone,
+            };
+
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fieldId: selectedField.id,
-          fieldName: selectedField.name,
-          date: toISODate(date),
-          startTime: range.startTime,
-          endTime: range.endTime,
-          price,
-          userName: form.name,
-          userEmail: form.email,
-          userPhone: form.phone,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur lors de la création du paiement");
@@ -74,6 +112,7 @@ export function BookingFlow() {
               onClick={() => {
                 setSelectedFieldId(f.id);
                 setRange({ startTime: null, endTime: null });
+                setMultiDay({ startDate: null, startTime: null, endDate: null, endTime: null });
                 setStep(1);
               }}
               className="group overflow-hidden rounded-lg border bg-card text-left transition-all hover:shadow-glow-sm"
@@ -92,7 +131,7 @@ export function BookingFlow() {
     );
   }
 
-  // Étape 1 : choix de la date et de l'horaire (libre, avec minutes)
+  // Étape 1 : choix de la date/horaire (1 jour ou plusieurs jours)
   if (step === 1 && selectedField) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -100,28 +139,64 @@ export function BookingFlow() {
           ← Changer de terrain
         </button>
         <h2 className="text-2xl font-bold mb-2">{selectedField.name}</h2>
-        <p className="text-muted-foreground mb-6">Choisissez une date et un horaire</p>
 
-        <DatePicker
-          value={date}
-          onChange={(d) => {
-            setDate(d);
-            setRange({ startTime: null, endTime: null });
-          }}
-        />
-
-        <div className="mt-6">
-          <TimeRangePicker
-            date={date}
-            pricePerHour={selectedField.pricePerHour}
-            value={range}
-            onChange={setRange}
-          />
+        {/* Bascule 1 jour / plusieurs jours */}
+        <div className="mb-6 inline-flex rounded-md border p-1">
+          <button
+            type="button"
+            onClick={() => setMode("single")}
+            className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${
+              mode === "single" ? "bg-primary text-white" : "text-muted-foreground"
+            }`}
+          >
+            Une journée
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("multi")}
+            className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${
+              mode === "multi" ? "bg-primary text-white" : "text-muted-foreground"
+            }`}
+          >
+            Plusieurs jours (location continue)
+          </button>
         </div>
+
+        {mode === "single" ? (
+          <>
+            <p className="text-muted-foreground mb-6">Choisissez une date et un horaire</p>
+            <DatePicker
+              value={date}
+              onChange={(d) => {
+                setDate(d);
+                setRange({ startTime: null, endTime: null });
+              }}
+            />
+            <div className="mt-6">
+              <TimeRangePicker
+                date={date}
+                pricePerHour={selectedField.pricePerHour}
+                value={range}
+                onChange={setRange}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-muted-foreground mb-6">
+              Le terrain vous sera réservé exclusivement, en continu, du début à la fin de la période.
+            </p>
+            <MultiDayPicker
+              pricePerHour={selectedField.pricePerHour}
+              value={multiDay}
+              onChange={setMultiDay}
+            />
+          </>
+        )}
 
         <button
           type="button"
-          disabled={!range.startTime || !range.endTime}
+          disabled={!isReady || price <= 0}
           onClick={() => setStep(2)}
           className="mt-8 w-full rounded-md bg-primary py-3 font-bold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -132,7 +207,14 @@ export function BookingFlow() {
   }
 
   // Étape 2 : coordonnées et paiement
-  if (step === 2 && selectedField && range.startTime && range.endTime) {
+  if (step === 2 && selectedField && isReady) {
+    const summary =
+      mode === "single"
+        ? `${selectedField.name} · ${toISODate(date)} · ${range.startTime} - ${range.endTime} (${formatDuration(range.startTime!, range.endTime!)})`
+        : `${selectedField.name} · du ${multiDay.startDate} ${multiDay.startTime} au ${multiDay.endDate} ${multiDay.endTime} (${formatSpanDuration(
+            computeSpanHours(multiDay.startDate!, multiDay.startTime!, multiDay.endDate!, multiDay.endTime!)
+          )})`;
+
     return (
       <div className="mx-auto max-w-md">
         <button onClick={() => setStep(1)} className="mb-4 text-sm text-primary hover:underline">
@@ -140,8 +222,7 @@ export function BookingFlow() {
         </button>
         <h2 className="text-2xl font-bold mb-2">Vos coordonnées</h2>
         <p className="text-muted-foreground mb-6">
-          {selectedField.name} · {toISODate(date)} · {range.startTime} - {range.endTime} (
-          {formatDuration(range.startTime, range.endTime)}) · {price.toFixed(2)} $
+          {summary} · {price.toFixed(2)} $
         </p>
 
         <div className="space-y-4">

@@ -9,13 +9,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { fieldId, fieldName, date, startTime, endTime, price, userName, userEmail, userPhone } = body;
+    const {
+      fieldId, fieldName, date, startTime, endTime, endDate,
+      price, userName, userEmail, userPhone,
+    } = body;
 
     if (!fieldId || !date || !startTime || !endTime || !price || !userEmail) {
       return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
     }
 
     const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL;
+
+    const isMultiDay = !!endDate && endDate !== date;
+    const label = isMultiDay
+      ? `Réservation ${fieldName} — du ${date} ${startTime} au ${endDate} ${endTime}`
+      : `Réservation ${fieldName} — ${date} de ${startTime} à ${endTime}`;
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -25,9 +33,7 @@ export async function POST(req: NextRequest) {
         {
           price_data: {
             currency: "cad",
-            product_data: {
-              name: `Réservation ${fieldName} — ${date} de ${startTime} à ${endTime}`,
-            },
+            product_data: { name: label },
             unit_amount: Math.round(Number(price) * 100),
           },
           quantity: 1,
@@ -39,6 +45,7 @@ export async function POST(req: NextRequest) {
         date,
         startTime,
         endTime,
+        endDate: endDate || "",
         userName,
         userEmail,
         userPhone,

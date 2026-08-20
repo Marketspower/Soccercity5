@@ -69,6 +69,7 @@ const mapReservationFromDb = (row: any): Reservation => ({
   date: row.date,
   startTime: row.start_time,
   endTime: row.end_time,
+  endDate: row.end_date ?? null,
   price: row.price,
   status: row.status,
   createdAt: row.created_at,
@@ -80,6 +81,7 @@ const mapBlockedFromDb = (row: any): BlockedSlot => ({
   date: row.date,
   startTime: row.start_time,
   endTime: row.end_time,
+  endDate: row.end_date ?? null,
   blocked: row.blocked,
   reason: row.reason,
 });
@@ -876,6 +878,7 @@ export const useAppStore = create<AppState>()(
               date: r.date,
               start_time: r.startTime,
               end_time: r.endTime,
+              end_date: r.endDate || null,
               price: r.price,
               status: 'confirmed'
             }])

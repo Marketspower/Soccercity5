@@ -73,7 +73,8 @@ export interface Field {
 
 export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
-// ✅ `hour` (créneau fixe) remplacé par `startTime`/`endTime` (format "HH:MM")
+// ✅ endDate optionnel : absent/null = réservation d'un seul jour (inchangé).
+// Renseigné = réservation continue de (date, startTime) à (endDate, endTime).
 export interface Reservation {
   id: string;
   userId: string | null;
@@ -83,6 +84,7 @@ export interface Reservation {
   date: string;
   startTime: string;
   endTime: string;
+  endDate: string | null;
   price: number;
   status: ReservationStatus;
   createdAt: string;
@@ -109,12 +111,13 @@ export interface PrivateEvent {
   gallery: GalleryImage[];
 }
 
-// ✅ `hour` remplacé par `startTime`/`endTime`
+// ✅ endDate optionnel, même logique que Reservation
 export interface BlockedSlot {
   id: string;
   date: string;
   startTime: string;
   endTime: string;
+  endDate: string | null;
   blocked: boolean;
   reason: string | null;
 }

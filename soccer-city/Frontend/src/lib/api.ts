@@ -7,7 +7,7 @@ import { toISODate } from "./utils";
 import type { EventType, GalleryImage, MediaItem } from "./types";
 
 // ============================================
-// CRÉNEAUX RÉSERVÉS/BLOQUÉS — pour vérifier les chevauchements
+// CRÉNEAUX RÉSERVÉS/BLOQUÉS — pour vérifier les chevauchements (1 jour)
 // ============================================
 
 export async function fetchBookedRanges(
@@ -47,6 +47,52 @@ export async function fetchBookedRanges(
 }
 
 // ============================================
+// ✅ Nouveau : plages réservées/bloquées sur plusieurs jours
+// (pour les réservations continues qui traversent des jours/nuits)
+// ============================================
+
+export interface BookedSpan {
+  date: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+}
+
+export async function fetchBookedSpans(fromDate: string, toDate: string): Promise<BookedSpan[]> {
+  const { data: reservationsData, error: reservationsError } = await supabase
+    .from("reservations")
+    .select("date, start_time, end_date, end_time")
+    .neq("status", "cancelled")
+    .lte("date", toDate);
+
+  if (reservationsError) {
+    console.error("❌ Erreur fetchBookedSpans (reservations):", reservationsError);
+  }
+
+  const { data: blockedData, error: blockedError } = await supabase
+    .from("availability")
+    .select("date, start_time, end_date, end_time")
+    .lte("date", toDate);
+
+  if (blockedError) {
+    console.error("❌ Erreur fetchBookedSpans (availability):", blockedError);
+  }
+
+  const normalize = (rows: any[] | null): BookedSpan[] =>
+    (rows || []).map((r) => ({
+      date: r.date,
+      startTime: r.start_time,
+      endDate: r.end_date || r.date,
+      endTime: r.end_time,
+    }));
+
+  // On ne garde que les entrées dont la fin tombe après le début de la fenêtre demandée
+  return [...normalize(reservationsData), ...normalize(blockedData)].filter(
+    (s) => s.endDate >= fromDate
+  );
+}
+
+// ============================================
 // RÉSERVATIONS
 // ============================================
 
@@ -54,12 +100,12 @@ export async function createReservation(input: {
   date: string;
   startTime: string;
   endTime: string;
+  endDate?: string | null;
   price: number;
   userName: string;
   userEmail: string;
   userPhone: string;
 }) {
-  // Vérifier qu'aucune réservation existante ne chevauche ce créneau
   const { data: existing } = await supabase
     .from('reservations')
     .select('id')
@@ -79,6 +125,7 @@ export async function createReservation(input: {
     date: input.date,
     startTime: input.startTime,
     endTime: input.endTime,
+    endDate: input.endDate || null,
     price: input.price,
   });
 
