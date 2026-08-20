@@ -915,7 +915,7 @@ export const useAppStore = create<AppState>()(
       // ============================================
       addEvent: async (e) => {
         try {
-          const { data, error } = await supabase
+          const { error } = await supabase
             .from('private_events')
             .insert([{
               first_name: e.firstName,
@@ -928,14 +928,34 @@ export const useAppStore = create<AppState>()(
               type: e.type,
               message: e.message,
               status: 'new'
-            }])
-            .select()
-            .single();
+            }]);
 
           if (error) throw error;
-          
-          await get().syncEvents();
-          return data as PrivateEvent;
+
+          // ✅ Pas de .select() après l'insert : un visiteur public n'a pas
+          // (et ne doit pas avoir) de droit SELECT sur private_events, qui
+          // contient des coordonnées personnelles. Demander à relire la ligne
+          // juste insérée provoquait une fausse violation RLS.
+          // On tente quand même de resynchroniser la liste admin si l'appelant
+          // est déjà admin (sinon ça échoue silencieusement, sans bloquer).
+          get().syncEvents().catch(() => {});
+
+          return {
+            id: '',
+            firstName: e.firstName,
+            lastName: e.lastName,
+            company: e.company,
+            phone: e.phone,
+            email: e.email,
+            date: e.date,
+            guests: e.guests,
+            type: e.type,
+            message: e.message,
+            status: 'new',
+            createdAt: new Date().toISOString(),
+            media: [],
+            gallery: [],
+          } as PrivateEvent;
         } catch (error) {
           console.error('❌ Erreur addEvent:', error);
           throw error;
