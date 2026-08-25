@@ -71,6 +71,17 @@ export interface Field {
   created_at?: string;
 }
 
+// ✅ Photos/vidéos multiples associées à un terrain (galerie du terrain)
+export interface FieldMediaItem {
+  id: string;
+  fieldId: string;
+  url: string;
+  type: 'image' | 'video';
+  thumbnail: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
 // ✅ endDate optionnel : absent/null = réservation d'un seul jour (inchangé).

@@ -34,21 +34,20 @@ export async function fetchBookedRanges(
     console.error("❌ Erreur fetchBookedRanges (availability):", blockedError);
   }
 
-  const reservationRanges = (reservationsData || []).map((r) => ({
-    startTime: r.start_time as string,
-    endTime: r.end_time as string,
+  const reservationRanges = (reservationsData || []).map((r: { start_time: string; end_time: string }) => ({
+    startTime: r.start_time,
+    endTime: r.end_time,
   }));
-  const blockedRanges = (blockedData || []).map((b) => ({
-    startTime: b.start_time as string,
-    endTime: b.end_time as string,
+  const blockedRanges = (blockedData || []).map((b: { start_time: string; end_time: string }) => ({
+    startTime: b.start_time,
+    endTime: b.end_time,
   }));
 
   return [...reservationRanges, ...blockedRanges];
 }
 
 // ============================================
-// ✅ Nouveau : plages réservées/bloquées sur plusieurs jours
-// (pour les réservations continues qui traversent des jours/nuits)
+// Plages réservées/bloquées sur plusieurs jours (réservations continues)
 // ============================================
 
 export interface BookedSpan {
@@ -86,7 +85,6 @@ export async function fetchBookedSpans(fromDate: string, toDate: string): Promis
       endTime: r.end_time,
     }));
 
-  // On ne garde que les entrées dont la fin tombe après le début de la fenêtre demandée
   return [...normalize(reservationsData), ...normalize(blockedData)].filter(
     (s) => s.endDate >= fromDate
   );
@@ -142,6 +140,8 @@ export async function createReservation(input: {
 // ÉVÉNEMENTS PRIVÉS
 // ============================================
 
+// ✅ Passe maintenant par une route API serveur : insertion via service_role
+// (plus fiable que le client) + déclenche courriels et SMS (client + admin).
 export async function createPrivateEvent(input: {
   firstName: string;
   lastName: string;
@@ -153,15 +153,16 @@ export async function createPrivateEvent(input: {
   type: EventType;
   message: string;
 }) {
-  const event = await useAppStore.getState().addEvent(input);
-  
-  await supabase.channel('events-changes').send({
-    type: 'broadcast',
-    event: 'new_event',
-    payload: event
+  const res = await fetch("/api/event-request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   });
 
-  return event;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Erreur lors de l'envoi de la demande");
+
+  return data;
 }
 
 // ============================================

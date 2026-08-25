@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { sendReservationConfirmationEmail, sendAdminNotificationEmail } from "@/lib/email";
+import { sendSMS, sendAdminSMS } from "@/lib/sms";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-07-29.dahlia",
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
 
       console.log("✅ Réservation et paiement enregistrés:", reservation.id);
 
-      // 3. Envoyer les courriels (client + notification admin)
+      // 3. Notifications — courriel + SMS, client et admin.
       const emailParams = {
         userName: metadata.userName,
         userEmail: metadata.userEmail,
@@ -98,9 +99,16 @@ export async function POST(req: NextRequest) {
         price: Number(metadata.price),
       };
 
-      await Promise.all([
+      await Promise.allSettled([
         sendReservationConfirmationEmail(emailParams),
         sendAdminNotificationEmail(emailParams),
+        sendSMS(
+          metadata.userPhone,
+          `Soccer City : réservation confirmée ! ${metadata.fieldName}, ${metadata.date} de ${metadata.startTime} à ${metadata.endTime}. Montant : ${metadata.price} $.`
+        ),
+        sendAdminSMS(
+          `Nouvelle réservation payée : ${metadata.userName} — ${metadata.fieldName}, ${metadata.date} ${metadata.startTime}-${metadata.endTime}. ${metadata.price} $.`
+        ),
       ]);
     } catch (error) {
       console.error("❌ Erreur enregistrement réservation/paiement:", error);

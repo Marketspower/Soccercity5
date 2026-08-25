@@ -16,6 +16,7 @@ import type {
   Rating,
   GalleryImage,
   MediaItem,
+  FieldMediaItem,
   CreateGalleryImage,
   CreateMediaItem,
   Page
@@ -86,11 +87,23 @@ const mapBlockedFromDb = (row: any): BlockedSlot => ({
   reason: row.reason,
 });
 
+// ✅ Mapping snake_case (Supabase) → camelCase pour les médias de terrain
+const mapFieldMediaFromDb = (row: any): FieldMediaItem => ({
+  id: row.id,
+  fieldId: row.field_id,
+  url: row.url,
+  type: row.type,
+  thumbnail: row.thumbnail,
+  sortOrder: row.sort_order,
+  createdAt: row.created_at,
+});
+
 interface AppState {
   // État
   fields: Field[];
   gallery: GalleryImage[];
   media: MediaItem[];
+  fieldMedia: FieldMediaItem[];
   reservations: Reservation[];
   events: PrivateEvent[];
   blocked: BlockedSlot[];
@@ -114,6 +127,7 @@ interface AppState {
   syncFields: () => Promise<void>;
   syncGallery: () => Promise<void>;
   syncMedia: () => Promise<void>;
+  syncFieldMedia: () => Promise<void>;
   syncReservations: () => Promise<void>;
   syncEvents: () => Promise<void>;
   syncBlocked: () => Promise<void>;
@@ -145,6 +159,11 @@ interface AppState {
   addMediaItem: (data: CreateMediaItem) => Promise<MediaItem>;
   updateMediaItem: (id: string, data: Partial<MediaItem>) => Promise<MediaItem>;
   deleteMediaItem: (id: string) => Promise<void>;
+
+  // Gestion des médias de terrain (photos/vidéos par terrain)
+  addFieldMediaItem: (fieldId: string, url: string, type: 'image' | 'video', thumbnail?: string | null) => Promise<FieldMediaItem>;
+  deleteFieldMediaItem: (id: string) => Promise<void>;
+  reorderFieldMediaItems: (ids: string[]) => Promise<void>;
 
   // Upload
   uploadImage: (file: File, folder?: string, bucket?: string) => Promise<string>;
@@ -188,6 +207,7 @@ export const useAppStore = create<AppState>()(
       fields: [],
       gallery: [],
       media: [],
+      fieldMedia: [],
       reservations: [],
       events: [],
       blocked: [],
@@ -231,6 +251,7 @@ export const useAppStore = create<AppState>()(
             get().syncFields(),
             get().syncGallery(),
             get().syncMedia(),
+            get().syncFieldMedia(),
             get().syncReservations(),
             get().syncEvents(),
             get().syncBlocked(),
@@ -279,6 +300,13 @@ export const useAppStore = create<AppState>()(
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'media' }, 
             () => { get().syncMedia(); })
+          .subscribe();
+
+        supabase
+          .channel('field-media-changes')
+          .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'field_media' }, 
+            () => { get().syncFieldMedia(); })
           .subscribe();
 
         supabase
@@ -395,6 +423,21 @@ export const useAppStore = create<AppState>()(
         } catch (error) {
           console.error('❌ Erreur syncMedia:', error);
           set({ media: [] });
+        }
+      },
+
+      syncFieldMedia: async () => {
+        try {
+          const { data, error } = await supabase
+            .from('field_media')
+            .select('*')
+            .order('sort_order', { ascending: true });
+
+          if (error) throw error;
+          set({ fieldMedia: (data || []).map(mapFieldMediaFromDb) });
+        } catch (error) {
+          console.error('❌ Erreur syncFieldMedia:', error);
+          set({ fieldMedia: [] });
         }
       },
 
@@ -865,6 +908,87 @@ export const useAppStore = create<AppState>()(
       },
 
       // ============================================
+      // GESTION DES MÉDIAS DE TERRAIN (photos/vidéos par terrain)
+      // ============================================
+      addFieldMediaItem: async (fieldId, url, type, thumbnail) => {
+        try {
+          // Place le nouveau média à la fin de l'ordre actuel pour ce terrain
+          const currentMax = get()
+            .fieldMedia.filter((m) => m.fieldId === fieldId)
+            .reduce((max, m) => Math.max(max, m.sortOrder), -1);
+
+          const { data, error } = await supabase
+            .from('field_media')
+            .insert([{
+              field_id: fieldId,
+              url,
+              type,
+              thumbnail: thumbnail || null,
+              sort_order: currentMax + 1,
+            }])
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          await get().syncFieldMedia();
+          return mapFieldMediaFromDb(data);
+        } catch (error) {
+          console.error('❌ Erreur addFieldMediaItem:', error);
+          throw error;
+        }
+      },
+
+      deleteFieldMediaItem: async (id) => {
+        try {
+          const { data: item } = await supabase
+            .from('field_media')
+            .select('url')
+            .eq('id', id)
+            .maybeSingle();
+
+          if (item?.url) {
+            const path = item.url.split('/').pop();
+            if (path) {
+              await supabase.storage
+                .from('media')
+                .remove([`fields/${path}`])
+                .catch(err => console.warn('⚠️ Erreur suppression storage:', err));
+            }
+          }
+
+          const { error } = await supabase
+            .from('field_media')
+            .delete()
+            .eq('id', id);
+
+          if (error) throw error;
+
+          await get().syncFieldMedia();
+        } catch (error) {
+          console.error('❌ Erreur deleteFieldMediaItem:', error);
+          throw error;
+        }
+      },
+
+      reorderFieldMediaItems: async (ids) => {
+        try {
+          const updates = ids.map((id, index) =>
+            supabase
+              .from('field_media')
+              .update({ sort_order: index })
+              .eq('id', id)
+          );
+
+          await Promise.all(updates);
+          await get().syncFieldMedia();
+        } catch (error) {
+          console.error('❌ Erreur reorderFieldMediaItems:', error);
+          throw error;
+        }
+      },
+
+      // ============================================
       // RÉSERVATIONS — ✅ startTime/endTime au lieu de hour
       // ============================================
       addReservation: async (r) => {
@@ -1151,6 +1275,7 @@ export const useAppStore = create<AppState>()(
           fields: [],
           gallery: [],
           media: [],
+          fieldMedia: [],
           reservations: [],
           events: [],
           blocked: [],
@@ -1174,6 +1299,7 @@ export const useAppStore = create<AppState>()(
         fields: state.fields,
         gallery: state.gallery,
         media: state.media,
+        fieldMedia: state.fieldMedia,
         reservations: state.reservations,
         events: state.events,
         blocked: state.blocked,
