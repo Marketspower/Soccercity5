@@ -16,6 +16,7 @@ import {
 import { useAppStore } from "@/lib/store";
 import { formatCAD } from "@/lib/utils";
 import type { Field, TurfType } from "@/lib/types";
+import { FieldMediaManager } from "@/components/admin/FieldMediaManager";
 
 const TURFS: TurfType[] = ["Gazon synthétique 5G", "Gazon synthétique hybride", "Gazon naturel"];
 const EMPTY: Omit<Field, "id" | "created_at"> = {
@@ -214,9 +215,13 @@ export default function AdminFields() {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    onClick={() => {
+                    onClick={async () => {
                       if (confirm(`Supprimer définitivement « ${f.name} » ?`)) {
-                        removeField(f.id);
+                        try {
+                          await removeField(f.id);
+                        } catch (error: any) {
+                          alert(error.message || 'Erreur lors de la suppression du terrain');
+                        }
                       }
                     }}
                     className="hover:bg-destructive/10"
@@ -239,6 +244,10 @@ export default function AdminFields() {
                   <span className="text-muted-foreground">Éclairage</span>
                   <p className="font-medium">{f.lighting ? '✅' : '❌'}</p>
                 </div>
+              </div>
+
+              <div className="mt-4 border-t pt-4">
+                <FieldMediaManager fieldId={f.id} fieldName={f.name} />
               </div>
             </div>
           </div>

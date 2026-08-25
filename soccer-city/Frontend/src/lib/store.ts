@@ -682,7 +682,17 @@ export const useAppStore = create<AppState>()(
             .delete()
             .eq('id', id);
 
-          if (error) throw error;
+          if (error) {
+            // ✅ Contrainte de clé étrangère : ce terrain a des paiements/réservations
+            // liés (historique réel à conserver). On donne un message clair au lieu
+            // de laisser passer l'erreur Postgres brute.
+            if (error.code === '23503') {
+              throw new Error(
+                "Impossible de supprimer ce terrain : il a des réservations ou paiements associés. Désactivez-le plutôt (interrupteur « actif ») pour le retirer du site sans perdre l'historique."
+              );
+            }
+            throw error;
+          }
           
           await get().syncFields();
         } catch (error) {
