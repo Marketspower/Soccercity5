@@ -11,6 +11,7 @@ import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { useAppStore } from "@/lib/store";
 import { formatCAD } from "@/lib/utils";
 import type { Field } from "@/lib/types";
+import { FieldGalleryTrigger } from "@/components/home/field-gallery-modal";
 
 function Spec({ Icon, label }: { Icon: React.ElementType; label: string }) {
   return (
@@ -65,7 +66,10 @@ function FieldCard({ field }: { field: Field }) {
       </div>
 
       <div className="p-6">
-        <h3 className="display text-2xl">{field.name}</h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="display text-2xl">{field.name}</h3>
+          <FieldGalleryTrigger field={field} />
+        </div>
 
         <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
           <Spec Icon={Ruler} label={field.dimensions} />
