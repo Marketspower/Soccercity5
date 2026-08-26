@@ -109,14 +109,16 @@ export default function AdminFields() {
     }
   };
 
-  // ✅ Fonction save avec validation et conversion de types
+  // ✅ Après une CRÉATION, on garde la fenêtre ouverte et on bascule en mode
+  // "édition" du terrain qui vient d'être créé : ça permet d'ajouter tout de
+  // suite plusieurs photos/vidéos (FieldMediaManager, plus bas) sans devoir
+  // fermer puis rouvrir la fenêtre depuis la liste.
   const save = async () => {
     if (!draft.name.trim()) {
       alert('Le nom du terrain est requis');
       return;
     }
 
-    // ✅ Nettoyer et convertir les données
     const payload = {
       name: draft.name.trim(),
       slug: draft.name.toLowerCase().replace(/\s+/g, '-'),
@@ -135,10 +137,13 @@ export default function AdminFields() {
     try {
       if (editingId) {
         await updateField(editingId, payload);
+        setOpen(false);
       } else {
-        await addField(payload);
+        const created = await addField(payload);
+        setEditingId(created.id);
+        setDraft({ ...created });
+        // On ne ferme pas : la section "Photos & vidéos" apparaît maintenant
       }
-      setOpen(false);
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde:', error);
       alert('Erreur lors de la sauvegarde du terrain');
@@ -264,9 +269,12 @@ export default function AdminFields() {
           </DialogHeader>
 
           <div className="grid gap-4">
-            {/* Upload d'image */}
+            {/* Upload d'image de couverture */}
             <div className="space-y-2">
-              <Label>Image du terrain</Label>
+              <Label>Image de couverture</Label>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Une seule photo, utilisée comme vignette principale sur le site.
+              </p>
               <div
                 className={`relative aspect-[16/9] rounded-lg overflow-hidden border-2 border-dashed transition-all ${
                   isDragging 
@@ -429,6 +437,22 @@ export default function AdminFields() {
             >
               {uploading ? "Upload en cours..." : editingId ? "Enregistrer les modifications" : "Créer le terrain"}
             </Button>
+
+            {/* ✅ Apparaît uniquement une fois le terrain enregistré (id disponible) :
+                permet d'ajouter tout de suite plusieurs photos/vidéos, sans fermer
+                la fenêtre. */}
+            {editingId && (
+              <div className="border-t pt-4">
+                <FieldMediaManager fieldId={editingId} fieldName={draft.name || "Ce terrain"} />
+                <Button
+                  variant="outline"
+                  className="mt-4 w-full"
+                  onClick={() => setOpen(false)}
+                >
+                  Terminé
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
