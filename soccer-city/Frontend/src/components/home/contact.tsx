@@ -41,8 +41,8 @@ export function Contact() {
 
   return (
     <section id="contact" className="container py-24 md:py-32">
-      <Reveal className="mb-14 max-w-2xl">
-        <p className="speed-eyebrow mb-4">Contact</p>
+      <Reveal className="mx-auto mb-14 max-w-2xl text-center">
+        <p className="speed-eyebrow mb-4 justify-center">Contactez-nous</p>
         <h2 className="display text-4xl sm:text-5xl">Parlons de votre <span className="text-primary">prochain match</span></h2>
       </Reveal>
 

@@ -38,9 +38,9 @@ export function Reviews() {
   return (
     <section id="avis" className="overflow-hidden py-24 md:py-32">
       <div className="container">
-        <Reveal className="mb-12 max-w-2xl">
-          <p className="speed-eyebrow mb-4">Avis clients</p>
-          <h2 className="display text-4xl sm:text-5xl">Ils jouent <span className="text-primary">chez nous</span></h2>
+        <Reveal className="mx-auto mb-12 max-w-2xl text-center">
+          <p className="speed-eyebrow mb-4 justify-center">Témoignages</p>
+          <h2 className="display text-4xl sm:text-5xl">Ce qu&apos;ils disent de <span className="text-primary">Soccer City</span></h2>
         </Reveal>
       </div>
 

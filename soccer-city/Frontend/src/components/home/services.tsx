@@ -25,8 +25,8 @@ export function Services() {
     <section id="services" className="relative overflow-hidden py-24 md:py-32">
       <div className="pointer-events-none absolute inset-0 bg-hero-radial opacity-50" aria-hidden />
       <div className="container relative">
-        <Reveal className="mb-14 max-w-2xl">
-          <p className="speed-eyebrow mb-4">Services</p>
+        <Reveal className="mx-auto mb-14 max-w-2xl text-center">
+          <p className="speed-eyebrow mb-4 justify-center">Nous proposons</p>
           <h2 className="display text-4xl sm:text-5xl">Tout est <span className="text-primary">inclus</span> dans l&apos;expérience</h2>
         </Reveal>
 

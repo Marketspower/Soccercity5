@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Facebook, Instagram, Mail, MapPin, Phone } from "lucide-react";
+import { Clock, Facebook, Instagram, MapPin, Phone } from "lucide-react";
+import { CONTACT } from "@/lib/data";
 
 const NAV = [
   { title: "Explorer", links: [
@@ -46,8 +47,13 @@ export function Footer() {
             />
             <p className="max-w-sm text-sm leading-relaxed text-white/60">
               Le complexe où le jeu s&apos;accélère. Terrains premium, réservation instantanée,
-              ouvert 7 jours sur 7 de 8 h à 23 h.
+              ouvert 7 jours sur 7.
             </p>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li className="flex items-center gap-2"><Clock className="size-4 shrink-0 text-primary" /> {CONTACT.hours}</li>
+              <li className="flex items-center gap-2"><MapPin className="size-4 shrink-0 text-primary" /> {CONTACT.address}</li>
+              <li className="flex items-center gap-2"><Phone className="size-4 shrink-0 text-primary" /> <a href={`tel:${CONTACT.phone.replace(/[^+\d]/g, "")}`} className="hover:text-white transition-colors">{CONTACT.phone}</a></li>
+            </ul>
             <div className="flex gap-3">
               {SOCIALS.map(({ href, label, Icon }) => (
                 <a

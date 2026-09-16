@@ -5,11 +5,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRef, useEffect, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { PartyPopper, ChevronDown } from "lucide-react";
+import { CalendarCheck, ChevronDown, Clock, MapPin, PartyPopper, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter } from "@/components/motion/counter";
 import { useAppStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
+import { CONTACT } from "@/lib/data";
 
 interface HomepageStats {
   fields_count: number;
@@ -45,7 +46,8 @@ export function Hero() {
     };
     fetchStats();
 
-    // Récupérer la vidéo depuis Supabase Storage
+    // Récupérer la vidéo mise en avant depuis Supabase Storage (facultatif :
+    // si aucune vidéo, la photo du terrain reste le fond du hero).
     const fetchVideo = async () => {
       try {
         const { data, error } = await supabase
@@ -65,7 +67,6 @@ export function Hero() {
         }
       } catch (error) {
         console.error('❌ Erreur chargement vidéo:', error);
-        setVideoUrl('/videos/hero.mp4');
       }
     };
 
@@ -73,149 +74,166 @@ export function Hero() {
   }, []);
 
   return (
-    <section
-      ref={ref}
-      className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#050607]"
-    >
-      <motion.div
-        style={{ y: bgY }}
-        className="absolute inset-0 gpu"
-        aria-hidden
+    <>
+      <section
+        ref={ref}
+        className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#050607]"
       >
-        {videoUrl && (
-          <video
-            className="absolute inset-0 h-full w-full object-cover opacity-40"
-            autoPlay
-            muted
-            loop
-            playsInline
-            poster={posterUrl || '/images/hero-poster.jpg'}
-          >
-            <source src={videoUrl} type="video/mp4" />
-          </video>
-        )}
-
-        <div className="absolute inset-0 bg-hero-radial" />
-        <div className="absolute inset-0 bg-field-lines" />
-
-        <motion.div
-          className="absolute -top-24 left-[12%] h-[70vh] w-40 rotate-[18deg] bg-gradient-to-b from-primary/25 to-transparent blur-2xl"
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute -top-24 right-[16%] h-[75vh] w-52 -rotate-[16deg] bg-gradient-to-b from-primary/20 to-transparent blur-2xl"
-          animate={{ opacity: [1, 0.4, 1] }}
-          transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut" }}
-        />
-
-        <motion.div
-          className="absolute -right-24 top-1/2 hidden w-[560px] -translate-y-1/2 opacity-[0.07] lg:block"
-          animate={{ x: [0, 14, 0] }}
-          transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-        >
+        {/* ===== Fond : photo du terrain (style Foot5) + vidéo mise en avant si dispo ===== */}
+        <motion.div style={{ y: bgY }} className="absolute inset-0 gpu" aria-hidden>
           <Image
-            src="/logo.png"
+            src="/images/hero-field.jpg"
             alt=""
-            width={560}
-            height={400}
-            className="w-full"
-          />
-        </motion.div>
-
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
-      </motion.div>
-
-      <motion.div
-        style={{ opacity: fade }}
-        className="container relative z-10 flex flex-1 flex-col justify-center pt-28 pb-16"
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.1 }}
-          className="mb-8 flex items-center gap-4"
-        >
-          <Image
-            src="/logo.png"
-            alt="Soccer City"
-            width={80}
-            height={80}
-            className="h-16 w-auto drop-shadow-glow"
+            fill
             priority
+            sizes="100vw"
+            className="object-cover"
           />
-          <div className="h-12 w-px bg-white/10" />
-          <p className="text-white/60 text-sm font-medium tracking-widest uppercase">
-            Complexe Premium
-          </p>
+          {videoUrl && (
+            <video
+              className="absolute inset-0 h-full w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+              poster={posterUrl || '/images/hero-field.jpg'}
+            >
+              <source src={videoUrl} type="video/mp4" />
+            </video>
+          )}
+
+          {/* Voile sombre à la Foot5 pour la lisibilité */}
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/80 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background to-transparent" />
         </motion.div>
 
-        <motion.p
-          initial={{ opacity: 0, x: -24 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.7, delay: 0.15 }}
-          className="speed-eyebrow mb-6 text-primary/80"
+        {/* ===== Contenu centré (style Foot5) ===== */}
+        <motion.div
+          style={{ opacity: fade }}
+          className="container relative z-10 flex flex-1 flex-col items-center justify-center pt-28 pb-24 text-center"
         >
-          ⚡ Le jeu s'accélère ici
-        </motion.p>
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.15 }}
+            className="mb-4 font-display text-sm font-bold uppercase italic tracking-[0.3em] text-primary sm:text-base"
+          >
+            Centre de soccer 5 contre 5
+          </motion.p>
 
-        <h1 className="display max-w-4xl text-5xl leading-[0.95] text-white sm:text-7xl lg:text-8xl">
-          {["Organisez", "tous vos événements", "en toute simplicité"].map(
-            (line, i) => (
-              <span key={line} className="block overflow-hidden">
-                <motion.span
-                  className="block"
-                  initial={{ y: "110%" }}
-                  animate={{ y: 0 }}
-                  transition={{
-                    duration: 0.9,
-                    delay: 0.25 + i * 0.12,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                >
-                  {i === 1 ? <span className="text-shine">{line}</span> : line}
-                </motion.span>
-              </span>
-            )
-          )}
-        </h1>
+          <h1 className="display text-6xl leading-[0.95] text-white sm:text-8xl lg:text-9xl">
+            <span className="block overflow-hidden">
+              <motion.span
+                className="block"
+                initial={{ y: "110%" }}
+                animate={{ y: 0 }}
+                transition={{ duration: 0.9, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              >
+                Bienvenue
+              </motion.span>
+            </span>
+          </h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.75 }}
-          className="mt-6 max-w-xl text-base text-white/70 sm:text-lg"
-        >
-          Des terrains d&apos;exception pour vos anniversaires, tournois,
-          activités d&apos;entreprise, sorties scolaires, compétitions, matchs
-          privés et célébrations, avec éclairage LED et réservation simplifiée.
-        </motion.p>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.7 }}
+            className="mt-6 max-w-2xl text-base text-white/80 sm:text-lg"
+          >
+            Terrain intérieur premium en gazon synthétique, éclairage LED et
+            réservation en ligne simplifiée. Matchs, anniversaires, tournois,
+            activités d&apos;entreprise — jouez toute l&apos;année, peu importe la météo.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.9 }}
+            className="mt-10 flex flex-col items-center gap-4 sm:flex-row"
+          >
+            <Button
+              asChild
+              variant="brand"
+              size="lg"
+              className="animate-pulse-glow rounded-full px-10"
+            >
+              <Link href="/reservation" className="flex items-center gap-2">
+                <CalendarCheck className="size-5" />
+                Réservez maintenant
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="glass"
+              size="lg"
+              className="rounded-full px-8 text-white"
+            >
+              <Link href="/evenements" className="flex items-center gap-2">
+                <PartyPopper className="size-5" />
+                Organiser un événement
+              </Link>
+            </Button>
+          </motion.div>
+        </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.9 }}
-          className="mt-10 flex flex-col gap-4 sm:flex-row"
+          className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-white/40"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 1.8, repeat: Infinity }}
+          aria-hidden
         >
-          <Button
-            asChild
-            variant="brand"
-            size="lg"
-            className="animate-pulse-glow group"
+          <ChevronDown className="size-6" />
+        </motion.div>
+      </section>
+
+      {/* ===== Bandeau infos (style Foot5 : Heures / Adresse / Téléphone) ===== */}
+      <section className="container relative z-10 -mt-2 pb-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7 }}
+          className="grid gap-px overflow-hidden rounded-lg glass sm:grid-cols-3"
+        >
+          <div className="flex items-start gap-4 bg-white/[0.02] p-6">
+            <Clock className="mt-1 size-6 shrink-0 text-primary" />
+            <div className="text-left">
+              <h3 className="display text-lg text-white">Heures d&apos;ouverture</h3>
+              <p className="mt-1 text-sm text-white/60">{CONTACT.hours}</p>
+            </div>
+          </div>
+          <a
+            href={`https://maps.google.com/?q=${encodeURIComponent(CONTACT.mapsQuery)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-4 bg-white/[0.02] p-6 transition-colors hover:bg-white/[0.05]"
           >
-            <Link href="/evenements" className="flex items-center gap-2">
-              <PartyPopper className="size-5" />
-              Choisir un événement
-            </Link>
-          </Button>
+            <MapPin className="mt-1 size-6 shrink-0 text-primary" />
+            <div className="text-left">
+              <h3 className="display text-lg text-white">Adresse</h3>
+              <p className="mt-1 text-sm text-white/60">{CONTACT.address}</p>
+            </div>
+          </a>
+          <a
+            href={`tel:${CONTACT.phone.replace(/[^+\d]/g, "")}`}
+            className="flex items-start gap-4 bg-white/[0.02] p-6 transition-colors hover:bg-white/[0.05]"
+          >
+            <Phone className="mt-1 size-6 shrink-0 text-primary" />
+            <div className="text-left">
+              <h3 className="display text-lg text-white">Téléphone</h3>
+              <p className="mt-1 text-sm text-white/60">{CONTACT.phone}</p>
+            </div>
+          </a>
         </motion.div>
 
-        {/* Statistiques en temps réel */}
+        {/* Statistiques en temps réel (logique conservée) */}
         <motion.dl
           initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 1.1 }}
-          className="mt-16 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-lg glass sm:grid-cols-4"
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.9, delay: 0.15 }}
+          className="mx-auto mt-6 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-lg glass sm:grid-cols-4"
         >
           <div className="bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Terrains</dt>
@@ -244,8 +262,7 @@ export function Hero() {
               Satisfaction
             </p>
           </div>
-          {/* ✅ Remplace "Années d'expérience" — vrai dès le premier jour, pas de maintenance requise */}
-          <div className="bg-white/[0.02] p-5 text-center sm:p-6 flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center justify-center bg-white/[0.02] p-5 text-center sm:p-6">
             <dt className="sr-only">Disponibilité</dt>
             <dd className="font-display text-3xl font-extrabold italic text-white sm:text-4xl">
               7j/7
@@ -257,29 +274,14 @@ export function Hero() {
         </motion.dl>
 
         {/* Indicateur de disponibilité temps réel */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
-          className="mt-8 flex items-center gap-3 text-xs text-white/40"
-        >
+        <div className="mt-6 flex items-center justify-center gap-3 text-xs text-white/40">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pitch opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-pitch" />
           </span>
-          Disponibilités en temps réel ·{" "}
-          {new Date().toLocaleTimeString("fr-CA")}
-        </motion.div>
-      </motion.div>
-
-      <motion.div
-        className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-white/40"
-        animate={{ y: [0, 8, 0] }}
-        transition={{ duration: 1.8, repeat: Infinity }}
-        aria-hidden
-      >
-        <ChevronDown className="size-6" />
-      </motion.div>
-    </section>
+          Disponibilités en temps réel · {new Date().toLocaleTimeString("fr-CA")}
+        </div>
+      </section>
+    </>
   );
 }

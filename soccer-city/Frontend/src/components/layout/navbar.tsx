@@ -58,7 +58,7 @@ export function Navbar() {
             <Link
               key={l.href}
               href={l.href}
-              className="text-sm font-medium text-white/70 hover:text-white transition-colors"
+              className="font-display text-xs font-bold uppercase italic tracking-widest text-white/70 hover:text-primary transition-colors"
             >
               {l.label}
             </Link>

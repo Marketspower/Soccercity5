@@ -57,11 +57,9 @@ export function Gallery() {
 
   return (
     <section id="galerie" className="container py-24 md:py-32">
-      <Reveal className="mb-14 max-w-2xl">
-        <p className="speed-eyebrow mb-4">Galerie</p>
-        <h2 className="display text-4xl sm:text-5xl">
-          L&apos;ambiance <span className="text-primary">Soccer City</span>
-        </h2>
+      <Reveal className="mx-auto mb-14 max-w-2xl text-center">
+        <p className="speed-eyebrow mb-4 justify-center">Notre galerie</p>
+        <h2 className="display text-4xl sm:text-5xl">Moments <span className="text-primary">capturés</span></h2>
       </Reveal>
 
       <div className="columns-2 gap-4 md:columns-3 lg:columns-4 [&>button]:mb-4">

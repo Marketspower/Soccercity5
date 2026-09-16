@@ -165,8 +165,8 @@ export function Fields() {
     <section id="terrains" className="relative py-24 md:py-32">
       <div className="pointer-events-none absolute inset-0 bg-field-lines" aria-hidden />
       <div className="container relative">
-        <Reveal className="mb-14 max-w-2xl">
-          <p className="speed-eyebrow mb-4">Nos terrains</p>
+        <Reveal className="mx-auto mb-14 max-w-2xl text-center">
+          <p className="speed-eyebrow mb-4 justify-center">Nos terrains</p>
           <h2 className="display text-4xl sm:text-5xl">
             Choisissez votre <span className="text-primary">surface de jeu</span>
           </h2>
