@@ -98,6 +98,13 @@ const mapFieldMediaFromDb = (row: any): FieldMediaItem => ({
   createdAt: row.created_at,
 });
 
+export interface SiteStat {
+  key: string;
+  label: string;
+  value: number;
+  suffix?: string;
+}
+
 interface AppState {
   // État
   fields: Field[];
@@ -111,6 +118,7 @@ interface AppState {
   pricing: PricingPlan[];
   ratings: Rating[];
   pages: Page[];
+  stats: SiteStat[];
   isLoading: boolean;
   isInitialized: boolean;
   uploading: boolean;
@@ -143,6 +151,8 @@ interface AppState {
   loadRatings: () => Promise<void>;
   loadReservations: () => Promise<void>;
   loadPages: () => Promise<void>;
+  loadStats: () => Promise<void>;
+  updateStat: (key: string, value: number) => Promise<void>;
 
   // Gestion des terrains
   addField: (f: Omit<Field, "id" | "created_at">) => Promise<Field>;
@@ -215,6 +225,7 @@ export const useAppStore = create<AppState>()(
       pricing: [],
       ratings: [],
       pages: [],
+      stats: [],
       isLoading: false,
       isInitialized: false,
       uploading: false,
@@ -561,6 +572,58 @@ export const useAppStore = create<AppState>()(
       loadRatings: async () => get().syncRatings(),
       loadReservations: async () => get().syncReservations(),
       loadPages: async () => get().syncPages(),
+
+      // ============================================
+      // STATISTIQUES DU SITE (page admin/statistiques)
+      // ============================================
+      loadStats: async () => {
+        const defaults: SiteStat[] = [
+          { key: 'reservations_count', label: 'Matchs joués', value: 0, suffix: '+' },
+          { key: 'satisfaction_percent', label: 'Satisfaction', value: 98, suffix: '%' },
+          { key: 'players_count', label: 'Joueurs actifs', value: 0, suffix: '+' },
+        ];
+        try {
+          const { data, error } = await supabase
+            .from('site_stats')
+            .select('*')
+            .order('key', { ascending: true });
+          if (error) throw error;
+          if (data && data.length > 0) {
+            set({
+              stats: data.map((row: any) => ({
+                key: row.key,
+                label: row.label,
+                value: Number(row.value) || 0,
+                suffix: row.suffix || '',
+              })),
+            });
+          } else {
+            set({ stats: defaults });
+          }
+        } catch (error) {
+          console.error('❌ Erreur loadStats (table site_stats absente ?):', error);
+          set({ stats: defaults });
+        }
+      },
+
+      updateStat: async (key, value) => {
+        // Mise à jour optimiste locale
+        set({
+          stats: get().stats.map((s) => (s.key === key ? { ...s, value } : s)),
+        });
+        try {
+          const current = get().stats.find((s) => s.key === key);
+          const { error } = await supabase
+            .from('site_stats')
+            .upsert(
+              { key, value, label: current?.label ?? key, suffix: current?.suffix ?? '' },
+              { onConflict: 'key' }
+            );
+          if (error) throw error;
+        } catch (error) {
+          console.error('❌ Erreur updateStat:', error);
+        }
+      },
 
       // ============================================
       // UPLOAD (images + médias vidéo/audio)
