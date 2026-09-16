@@ -47,6 +47,77 @@ export async function fetchBookedRanges(
 }
 
 // ============================================
+// CRÉNEAUX HORAIRES (grille de réservation)
+// ============================================
+
+export type SlotState = "free" | "taken" | "blocked";
+
+export interface Slot {
+  hour: number;
+  label: string;
+  state: SlotState;
+}
+
+const OPENING_HOUR = 8;   // 8 h
+const CLOSING_HOUR = 23;  // dernier créneau : 22 h – 23 h
+
+export async function fetchSlots(date: Date): Promise<Slot[]> {
+  const iso = toISODate(date);
+
+  const { data: reservationsData, error: reservationsError } = await supabase
+    .from("reservations")
+    .select("start_time, end_time")
+    .eq("date", iso)
+    .neq("status", "cancelled");
+
+  if (reservationsError) {
+    console.error("❌ Erreur fetchSlots (reservations):", reservationsError);
+  }
+
+  const { data: blockedData, error: blockedError } = await supabase
+    .from("availability")
+    .select("start_time, end_time")
+    .eq("date", iso);
+
+  if (blockedError) {
+    console.error("❌ Erreur fetchSlots (availability):", blockedError);
+  }
+
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + (m || 0);
+  };
+
+  const taken = (reservationsData || []).map((r: { start_time: string; end_time: string }) => ({
+    start: toMinutes(r.start_time),
+    end: toMinutes(r.end_time),
+  }));
+  const blocked = (blockedData || []).map((b: { start_time: string; end_time: string }) => ({
+    start: toMinutes(b.start_time),
+    end: toMinutes(b.end_time),
+  }));
+
+  const slots: Slot[] = [];
+  for (let hour = OPENING_HOUR; hour < CLOSING_HOUR; hour++) {
+    const start = hour * 60;
+    const end = start + 60;
+    const overlaps = (r: { start: number; end: number }) => r.start < end && r.end > start;
+
+    let state: SlotState = "free";
+    if (blocked.some(overlaps)) state = "blocked";
+    else if (taken.some(overlaps)) state = "taken";
+
+    slots.push({
+      hour,
+      label: `${hour} h – ${hour + 1} h`,
+      state,
+    });
+  }
+
+  return slots;
+}
+
+// ============================================
 // Plages réservées/bloquées sur plusieurs jours (réservations continues)
 // ============================================
 
