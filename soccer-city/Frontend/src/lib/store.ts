@@ -103,6 +103,7 @@ export interface SiteStat {
   label: string;
   value: number;
   suffix?: string;
+  updated_at: string;
 }
 
 interface AppState {
@@ -578,9 +579,9 @@ export const useAppStore = create<AppState>()(
       // ============================================
       loadStats: async () => {
         const defaults: SiteStat[] = [
-          { key: 'reservations_count', label: 'Matchs joués', value: 0, suffix: '+' },
-          { key: 'satisfaction_percent', label: 'Satisfaction', value: 98, suffix: '%' },
-          { key: 'players_count', label: 'Joueurs actifs', value: 0, suffix: '+' },
+          { key: 'reservations_count', label: 'Matchs joués', value: 0, suffix: '+', updated_at: new Date().toISOString() },
+          { key: 'satisfaction_percent', label: 'Satisfaction', value: 98, suffix: '%', updated_at: new Date().toISOString() },
+          { key: 'players_count', label: 'Joueurs actifs', value: 0, suffix: '+', updated_at: new Date().toISOString() },
         ];
         try {
           const { data, error } = await supabase
@@ -595,6 +596,7 @@ export const useAppStore = create<AppState>()(
                 label: row.label,
                 value: Number(row.value) || 0,
                 suffix: row.suffix || '',
+                updated_at: row.updated_at || new Date().toISOString(),
               })),
             });
           } else {
@@ -609,14 +611,14 @@ export const useAppStore = create<AppState>()(
       updateStat: async (key, value) => {
         // Mise à jour optimiste locale
         set({
-          stats: get().stats.map((s) => (s.key === key ? { ...s, value } : s)),
+          stats: get().stats.map((s) => (s.key === key ? { ...s, value, updated_at: new Date().toISOString() } : s)),
         });
         try {
           const current = get().stats.find((s) => s.key === key);
           const { error } = await supabase
             .from('site_stats')
             .upsert(
-              { key, value, label: current?.label ?? key, suffix: current?.suffix ?? '' },
+              { key, value, label: current?.label ?? key, suffix: current?.suffix ?? '', updated_at: new Date().toISOString() },
               { onConflict: 'key' }
             );
           if (error) throw error;
