@@ -33,9 +33,9 @@ export function CalendarMonth({ monthDate, bookings, onSelect, onShowDay }: Prop
         map.set(day, list);
       }
     }
-    for (const list of map.values()) {
+    map.forEach((list) => {
       list.sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? ""));
-    }
+    });
     return map;
   }, [bookings]);
 
