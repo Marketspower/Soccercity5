@@ -82,7 +82,7 @@ export function Hero() {
         {/* ===== Fond : photo du terrain (style Foot5) + vidéo mise en avant si dispo ===== */}
         <motion.div style={{ y: bgY }} className="absolute inset-0 gpu" aria-hidden>
           <Image
-            src="/images/hero-field.jpg"
+            src="/images/font.png"
             alt=""
             fill
             priority
