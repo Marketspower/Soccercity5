@@ -166,7 +166,8 @@ export function EventOptions() {
                   </div>
 
                   <p className="mt-5 text-xl font-bold text-primary">
-                    {field.pricePerHour} $ / heure
+                    {field.pricePerHour} $ / heure{" "}
+                    <span className="text-xs font-medium text-muted-foreground">+ taxes</span>
                   </p>
 
                   <span className="mt-5 inline-flex items-center font-semibold text-primary">

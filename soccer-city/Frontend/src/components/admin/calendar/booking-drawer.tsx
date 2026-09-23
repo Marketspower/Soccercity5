@@ -126,7 +126,18 @@ export function BookingDrawer({ booking, onClose, onSetStatus }: Props) {
               {booking.email}
             </a>
           </Row>
-          {booking.price !== null && <Row label="Montant">{formatCAD(booking.price)}</Row>}
+          {booking.price !== null && booking.total !== null ? (
+            <>
+              <Row label="Sous-total">{formatCAD(booking.price)}</Row>
+              {booking.taxGst !== null && <Row label="TPS">{formatCAD(booking.taxGst)}</Row>}
+              {booking.taxQst !== null && <Row label="TVQ">{formatCAD(booking.taxQst)}</Row>}
+              <Row label="Total payé">
+                <span className="font-bold">{formatCAD(booking.total)}</span>
+              </Row>
+            </>
+          ) : (
+            booking.price !== null && <Row label="Montant">{formatCAD(booking.price)}</Row>
+          )}
           {booking.guests !== null && <Row label="Invités">{booking.guests} personne(s)</Row>}
           {booking.message && (
             <div className="rounded-lg border border-dashed bg-card/60 p-3 text-sm text-muted-foreground">

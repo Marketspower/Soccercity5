@@ -18,13 +18,13 @@ import { formatCAD } from "@/lib/utils";
 import type { Field, TurfType } from "@/lib/types";
 import { FieldMediaManager } from "@/components/admin/FieldMediaManager";
 
-const TURFS: TurfType[] = ["Gazon synthétique 5G", "Gazon synthétique hybride", "Gazon naturel"];
+const TURFS: TurfType[] = ["Gazon artificiel", "Gazon synthétique 5G", "Gazon synthétique hybride", "Gazon naturel"];
 const EMPTY: Omit<Field, "id" | "created_at"> = {
   name: "", 
   slug: "", 
   image: "", 
   dimensions: "40 × 20 m",
-  turf: "Gazon synthétique 5G", 
+  turf: "Gazon artificiel", 
   lighting: true, 
   lockerRooms: 2, 
   parking: true,
@@ -124,7 +124,7 @@ export default function AdminFields() {
       slug: draft.name.toLowerCase().replace(/\s+/g, '-'),
       image: draft.image || '',
       dimensions: draft.dimensions || '40 × 20 m',
-      turf: draft.turf || 'Gazon synthétique 5G',
+      turf: draft.turf || 'Gazon artificiel',
       lighting: draft.lighting ?? true,
       lockerRooms: Number(draft.lockerRooms) || 2,
       parking: draft.parking ?? true,

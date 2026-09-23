@@ -59,6 +59,9 @@ export async function POST(req: NextRequest) {
           end_time: metadata.endTime,
           end_date: metadata.endDate || null,
           price: Number(metadata.price),
+          tax_gst: metadata.taxGst ? Number(metadata.taxGst) : null,
+          tax_qst: metadata.taxQst ? Number(metadata.taxQst) : null,
+          total: metadata.total ? Number(metadata.total) : null,
           status: "confirmed",
         })
         .select()
@@ -96,7 +99,7 @@ export async function POST(req: NextRequest) {
         date: metadata.date,
         startTime: metadata.startTime,
         endTime: metadata.endTime,
-        price: Number(metadata.price),
+        price: Number(metadata.total || metadata.price),
       };
 
       await Promise.allSettled([
@@ -104,10 +107,10 @@ export async function POST(req: NextRequest) {
         sendAdminNotificationEmail(emailParams),
         sendSMS(
           metadata.userPhone,
-          `Soccer City : réservation confirmée ! ${metadata.fieldName}, ${metadata.date} de ${metadata.startTime} à ${metadata.endTime}. Montant : ${metadata.price} $.`
+          `Soccer City : réservation confirmée ! ${metadata.fieldName}, ${metadata.date} de ${metadata.startTime} à ${metadata.endTime}. Montant : ${metadata.total || metadata.price} $ (taxes incluses).`
         ),
         sendAdminSMS(
-          `Nouvelle réservation payée : ${metadata.userName} — ${metadata.fieldName}, ${metadata.date} ${metadata.startTime}-${metadata.endTime}. ${metadata.price} $.`
+          `Nouvelle réservation payée : ${metadata.userName} — ${metadata.fieldName}, ${metadata.date} ${metadata.startTime}-${metadata.endTime}. ${metadata.total || metadata.price} $ TTC.`
         ),
       ]);
     } catch (error) {

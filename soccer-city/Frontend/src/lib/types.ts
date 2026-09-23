@@ -52,7 +52,7 @@ export interface MediaItem {
   updatedAt: string;
 }
 
-export type TurfType = "Gazon synthétique 5G" | "Gazon synthétique hybride" | "Gazon naturel";
+export type TurfType = "Gazon artificiel" | "Gazon synthétique 5G" | "Gazon synthétique hybride" | "Gazon naturel";
 
 export interface Field {
   id: string;
@@ -97,6 +97,10 @@ export interface Reservation {
   endTime: string;
   endDate: string | null;
   price: number;
+  // ✅ Taxes calculées au moment du paiement (null pour les anciennes réservations)
+  taxGst: number | null;
+  taxQst: number | null;
+  total: number | null;
   status: ReservationStatus;
   createdAt: string;
 }

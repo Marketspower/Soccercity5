@@ -96,7 +96,11 @@ export function BookingList({ bookings, onSelect, onSetStatus }: Props) {
                   </span>
                 </td>
                 <td className="px-4 py-3 font-bold italic">
-                  {b.price !== null ? formatCAD(b.price) : "—"}
+                  {b.total !== null
+                    ? formatCAD(b.total)
+                    : b.price !== null
+                      ? formatCAD(b.price)
+                      : "—"}
                 </td>
                 <td className="px-4 py-3">
                   <Badge

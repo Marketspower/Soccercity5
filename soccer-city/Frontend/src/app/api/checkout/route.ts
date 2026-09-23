@@ -1,6 +1,7 @@
 // app/api/checkout/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { computeTaxes, loadTaxSettings } from "@/lib/taxes";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-07-29.dahlia",
@@ -20,6 +21,10 @@ export async function POST(req: NextRequest) {
 
     const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL;
 
+    // ✅ Taxes recalculées côté serveur (on ne fait pas confiance au montant du navigateur)
+    const taxSettings = await loadTaxSettings();
+    const taxes = computeTaxes(Number(price), taxSettings);
+
     const isMultiDay = !!endDate && endDate !== date;
     const label = isMultiDay
       ? `Réservation ${fieldName} — du ${date} ${startTime} au ${endDate} ${endTime}`
@@ -33,8 +38,11 @@ export async function POST(req: NextRequest) {
         {
           price_data: {
             currency: "cad",
-            product_data: { name: label },
-            unit_amount: Math.round(Number(price) * 100),
+            product_data: {
+              name: label,
+              description: `Sous-total ${taxes.subtotal.toFixed(2)} $ + TPS (${taxSettings.gstRate} %) ${taxes.gst.toFixed(2)} $ + TVQ (${taxSettings.qstRate} %) ${taxes.qst.toFixed(2)} $`,
+            },
+            unit_amount: Math.round(taxes.total * 100),
           },
           quantity: 1,
         },
@@ -49,7 +57,10 @@ export async function POST(req: NextRequest) {
         userName,
         userEmail,
         userPhone,
-        price: String(price),
+        price: String(taxes.subtotal),
+        taxGst: String(taxes.gst),
+        taxQst: String(taxes.qst),
+        total: String(taxes.total),
       },
       success_url: `${origin}/reservation/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/reservation/cancel`,

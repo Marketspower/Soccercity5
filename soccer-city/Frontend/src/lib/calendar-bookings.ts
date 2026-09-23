@@ -24,6 +24,9 @@ export interface CalendarBooking {
   /** Statut unifié : new→pending, accepted→confirmed, declined→cancelled. */
   status: ReservationStatus;
   price: number | null;
+  taxGst: number | null;
+  taxQst: number | null;
+  total: number | null;
   guests: number | null;
   message: string | null;
   createdAt: string;
@@ -66,6 +69,9 @@ export function buildCalendarBookings(
     type: "Terrain",
     status: r.status,
     price: r.price,
+    taxGst: r.taxGst ?? null,
+    taxQst: r.taxQst ?? null,
+    total: r.total ?? null,
     guests: null,
     message: null,
     createdAt: r.createdAt,
@@ -86,6 +92,9 @@ export function buildCalendarBookings(
     type: e.type,
     status: EVENT_TO_UNIFIED[e.status],
     price: null,
+    taxGst: null,
+    taxQst: null,
+    total: null,
     guests: e.guests,
     message: e.message || null,
     createdAt: e.createdAt,

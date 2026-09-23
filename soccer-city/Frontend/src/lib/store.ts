@@ -72,6 +72,9 @@ const mapReservationFromDb = (row: any): Reservation => ({
   endTime: row.end_time,
   endDate: row.end_date ?? null,
   price: row.price,
+  taxGst: row.tax_gst ?? null,
+  taxQst: row.tax_qst ?? null,
+  total: row.total ?? null,
   status: row.status,
   createdAt: row.created_at,
 });
