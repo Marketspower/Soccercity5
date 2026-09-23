@@ -4,6 +4,7 @@
 import { supabase } from "./supabase";
 import { useAppStore } from "./store";
 import { toISODate } from "./utils";
+import { computeTaxes, loadTaxSettings } from "./taxes";
 import type { EventType, GalleryImage, MediaItem } from "./types";
 
 // ============================================
@@ -187,6 +188,9 @@ export async function createReservation(input: {
     throw new Error('Ce créneau chevauche une réservation existante');
   }
 
+  // ✅ Taxes TPS/TVQ calculées avec les taux configurés dans l'admin
+  const taxes = computeTaxes(input.price, await loadTaxSettings());
+
   const reservation = await useAppStore.getState().addReservation({
     userName: input.userName,
     userEmail: input.userEmail,
@@ -195,7 +199,10 @@ export async function createReservation(input: {
     startTime: input.startTime,
     endTime: input.endTime,
     endDate: input.endDate || null,
-    price: input.price,
+    price: taxes.subtotal,
+    taxGst: taxes.gst,
+    taxQst: taxes.qst,
+    total: taxes.total,
   });
 
   await supabase.channel('reservations-changes').send({

@@ -1082,6 +1082,9 @@ export const useAppStore = create<AppState>()(
               end_time: r.endTime,
               end_date: r.endDate || null,
               price: r.price,
+              tax_gst: r.taxGst,
+              tax_qst: r.taxQst,
+              total: r.total,
               status: 'confirmed'
             }])
             .select()
