@@ -2,8 +2,8 @@
 // Fusionne les réservations de terrain (Reservation) et les événements privés
 // (PrivateEvent) en un type unifié pour le calendrier/liste admin.
 
-import type { PrivateEvent, Reservation, ReservationStatus } from "@/lib/types";
-import type { BookingTypeKey } from "@/config/reservation-types";
+import type { PaymentOption, PrivateEvent, Reservation, ReservationStatus } from "@/lib/types";
+import { BOOKING_TYPES, type BookingTypeKey } from "@/config/reservation-types";
 
 export interface CalendarBooking {
   /** Identifiant unique côté UI (préfixé pour éviter les collisions entre tables). */
@@ -27,6 +27,9 @@ export interface CalendarBooking {
   taxGst: number | null;
   taxQst: number | null;
   total: number | null;
+  paymentOption: PaymentOption | null;
+  amountPaid: number | null;
+  balanceDue: number | null;
   guests: number | null;
   message: string | null;
   createdAt: string;
@@ -66,13 +69,18 @@ export function buildCalendarBookings(
     phone: r.userPhone,
     email: r.userEmail,
     company: null,
-    type: "Terrain",
+    // ✅ Le type vient de la base ('Terrain' ou 'Anniversaire') ; repli sur
+    // Terrain si une valeur inconnue apparaît.
+    type: (r.type in BOOKING_TYPES ? r.type : "Terrain") as BookingTypeKey,
     status: r.status,
     price: r.price,
     taxGst: r.taxGst ?? null,
     taxQst: r.taxQst ?? null,
     total: r.total ?? null,
-    guests: null,
+    paymentOption: r.paymentOption,
+    amountPaid: r.amountPaid,
+    balanceDue: r.balanceDue,
+    guests: r.guests,
     message: null,
     createdAt: r.createdAt,
   }));
@@ -95,6 +103,9 @@ export function buildCalendarBookings(
     taxGst: null,
     taxQst: null,
     total: null,
+    paymentOption: null,
+    amountPaid: null,
+    balanceDue: null,
     guests: e.guests,
     message: e.message || null,
     createdAt: e.createdAt,

@@ -9,10 +9,15 @@ import { useAppStore } from "@/lib/store";
 import { formatCAD } from "@/lib/utils";
 import {
   DEFAULT_TAX_SETTINGS,
+  DEFAULT_PAYMENT_SETTINGS,
   computeTaxes,
+  computeDeposit,
   loadTaxSettings,
   saveTaxSettings,
+  loadPaymentSettings,
+  savePaymentSettings,
   type TaxSettings,
+  type PaymentSettings,
 } from "@/lib/taxes";
 
 export default function AdminPricing() {
@@ -23,9 +28,25 @@ export default function AdminPricing() {
   const [taxes, setTaxes] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [taxState, setTaxState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
+  const [pay, setPay] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
+  const [payState, setPayState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
   useEffect(() => {
     loadTaxSettings().then(setTaxes).catch(() => {});
+    loadPaymentSettings().then(setPay).catch(() => {});
   }, []);
+
+  const handleSavePay = async () => {
+    setPayState("saving");
+    try {
+      await savePaymentSettings(pay);
+      setPayState("saved");
+      setTimeout(() => setPayState("idle"), 1800);
+    } catch (error) {
+      console.error("❌ Erreur enregistrement acompte:", error);
+      setPayState("error");
+    }
+  };
 
   const handleSaveTaxes = async () => {
     setTaxState("saving");
@@ -170,6 +191,67 @@ export default function AdminPricing() {
         {taxState === "error" && (
           <p className="mt-2 text-sm text-destructive">
             Impossible d&apos;enregistrer. Vérifie que la table « settings » existe (voir le SQL fourni).
+          </p>
+        )}
+      </section>
+
+      {/* ===== Section Acompte (paiement partiel) ===== */}
+      <section className="rounded-lg border bg-card p-6">
+        <h2 className="text-xl font-bold">💳 Acompte à la réservation</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Les clients peuvent payer la totalité, ou cet acompte avec le solde dû
+          le jour de l&apos;événement avant l&apos;accès au terrain. Sous le
+          montant minimum, seule la totalité est offerte.
+        </p>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="dep-pct">Pourcentage de l&apos;acompte (%)</Label>
+            <Input
+              id="dep-pct"
+              type="number"
+              min={1}
+              max={99}
+              value={pay.depositPercent}
+              onChange={(e) => setPay((p) => ({ ...p, depositPercent: Number(e.target.value) }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dep-min">Montant minimum avant taxes ($)</Label>
+            <Input
+              id="dep-min"
+              type="number"
+              min={0}
+              step={10}
+              value={pay.depositMinSubtotal}
+              onChange={(e) => setPay((p) => ({ ...p, depositMinSubtotal: Number(e.target.value) }))}
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground">
+            Aperçu forfait anniversaire : {computeTaxes(400, taxes).total.toFixed(2)} $ → acompte{" "}
+            <b className="text-foreground">
+              {computeDeposit(computeTaxes(400, taxes).total, pay).deposit.toFixed(2)} $
+            </b>{" "}
+            + solde {computeDeposit(computeTaxes(400, taxes).total, pay).balance.toFixed(2)} $ ·
+            1 h de terrain (130 $) : {130 >= pay.depositMinSubtotal ? "acompte offert" : "totalité seulement"}
+          </p>
+          <Button
+            onClick={handleSavePay}
+            disabled={payState === "saving"}
+            variant={payState === "saved" ? "pitch" : "brand"}
+            className="w-44"
+          >
+            {payState === "saving" && "Enregistrement…"}
+            {payState === "saved" && <><Check /> Enregistré</>}
+            {(payState === "idle" || payState === "error") && "Enregistrer"}
+          </Button>
+        </div>
+        {payState === "error" && (
+          <p className="mt-2 text-sm text-destructive">
+            Impossible d&apos;enregistrer. Exécute d&apos;abord migration-forfaits.sql dans Supabase.
           </p>
         )}
       </section>

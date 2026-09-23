@@ -84,6 +84,11 @@ export interface FieldMediaItem {
 
 export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
+// ✅ Mode de paiement choisi à la réservation :
+// 'full' = totalité payée en ligne, 'deposit' = acompte payé, solde dû
+// avant l'accès au terrain le jour de l'événement.
+export type PaymentOption = "full" | "deposit";
+
 // ✅ endDate optionnel : absent/null = réservation d'un seul jour (inchangé).
 // Renseigné = réservation continue de (date, startTime) à (endDate, endTime).
 export interface Reservation {
@@ -101,6 +106,14 @@ export interface Reservation {
   taxGst: number | null;
   taxQst: number | null;
   total: number | null;
+  // ✅ Forfaits : 'Terrain' par défaut, 'Anniversaire' pour une fête
+  type: string;
+  guests: number | null;
+  // ✅ Paiement : null pour les anciennes réservations (considérées payées)
+  paymentOption: PaymentOption | null;
+  amountPaid: number | null;
+  balanceDue: number | null;
+  balancePaidAt: string | null;
   status: ReservationStatus;
   createdAt: string;
 }

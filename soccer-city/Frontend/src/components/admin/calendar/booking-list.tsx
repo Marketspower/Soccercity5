@@ -101,6 +101,11 @@ export function BookingList({ bookings, onSelect, onSetStatus }: Props) {
                     : b.price !== null
                       ? formatCAD(b.price)
                       : "—"}
+                  {(b.balanceDue ?? 0) > 0 && (
+                    <span className="block text-[10px] font-bold not-italic text-amber-500">
+                      Solde : {formatCAD(b.balanceDue as number)}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <Badge

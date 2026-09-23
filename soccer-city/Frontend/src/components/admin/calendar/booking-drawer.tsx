@@ -19,6 +19,8 @@ interface Props {
   booking: CalendarBooking | null;
   onClose: () => void;
   onSetStatus: (booking: CalendarBooking, status: ReservationStatus) => void;
+  /** Marque le solde (acompte) comme réglé — réservations uniquement. */
+  onMarkBalancePaid?: (booking: CalendarBooking) => void;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -32,7 +34,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function BookingDrawer({ booking, onClose, onSetStatus }: Props) {
+export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid }: Props) {
   useEffect(() => {
     if (!booking) return;
     const onKey = (e: KeyboardEvent) => {
@@ -131,12 +133,42 @@ export function BookingDrawer({ booking, onClose, onSetStatus }: Props) {
               <Row label="Sous-total">{formatCAD(booking.price)}</Row>
               {booking.taxGst !== null && <Row label="TPS">{formatCAD(booking.taxGst)}</Row>}
               {booking.taxQst !== null && <Row label="TVQ">{formatCAD(booking.taxQst)}</Row>}
-              <Row label="Total payé">
+              <Row label="Total">
                 <span className="font-bold">{formatCAD(booking.total)}</span>
               </Row>
             </>
           ) : (
             booking.price !== null && <Row label="Montant">{formatCAD(booking.price)}</Row>
+          )}
+
+          {/* ===== Paiement : totalité ou acompte + solde ===== */}
+          {booking.paymentOption && (
+            (booking.balanceDue ?? 0) > 0 ? (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3.5 text-sm">
+                <p className="font-bold text-amber-500">
+                  🟠 Acompte payé : {formatCAD(booking.amountPaid ?? 0)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Solde à percevoir <b>avant l&apos;accès au terrain</b> :
+                </p>
+                <p className="font-display text-xl font-black italic">
+                  {formatCAD(booking.balanceDue as number)}
+                </p>
+                {booking.source === "reservation" && onMarkBalancePaid && (
+                  <Button
+                    className="mt-2 w-full"
+                    variant="outline"
+                    onClick={() => onMarkBalancePaid(booking)}
+                  >
+                    <Check className="mr-1.5 size-4 text-pitch" /> Marquer le solde comme payé
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-pitch/40 bg-pitch/10 p-3 text-sm font-bold text-pitch">
+                ✅ Payé en totalité — accès direct au terrain
+              </div>
+            )
           )}
           {booking.guests !== null && <Row label="Invités">{booking.guests} personne(s)</Row>}
           {booking.message && (

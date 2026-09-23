@@ -12,6 +12,7 @@ import { useAppStore } from "@/lib/store";
 const LINKS = [
   { href: "/#terrains", label: "Terrains" },
   { href: "/#tarifs", label: "Tarifs" },
+  { href: "/forfaits", label: "Forfaits" },
   { href: "/#galerie", label: "Galerie" },
   { href: "/evenements", label: "Événements" },
   { href: "/#contact", label: "Contact" },

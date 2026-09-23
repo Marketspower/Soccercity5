@@ -203,6 +203,12 @@ export async function createReservation(input: {
     taxGst: taxes.gst,
     taxQst: taxes.qst,
     total: taxes.total,
+    type: "Terrain",
+    guests: null,
+    paymentOption: "full",
+    amountPaid: taxes.total,
+    balanceDue: 0,
+    balancePaidAt: null,
   });
 
   await supabase.channel('reservations-changes').send({

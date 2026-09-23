@@ -75,6 +75,12 @@ const mapReservationFromDb = (row: any): Reservation => ({
   taxGst: row.tax_gst ?? null,
   taxQst: row.tax_qst ?? null,
   total: row.total ?? null,
+  type: row.type || 'Terrain',
+  guests: row.guests ?? null,
+  paymentOption: row.payment_option ?? null,
+  amountPaid: row.amount_paid ?? null,
+  balanceDue: row.balance_due ?? null,
+  balancePaidAt: row.balance_paid_at ?? null,
   status: row.status,
   createdAt: row.created_at,
 });
@@ -185,6 +191,8 @@ interface AppState {
   // Réservations — ✅ userId retiré (jamais réellement inséré en base) et hour → startTime/endTime
   addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status" | "userId">) => Promise<Reservation>;
   setReservationStatus: (id: string, status: ReservationStatus) => Promise<void>;
+  /** Marque le solde d'une réservation payée en acompte comme réglé (jour J). */
+  markReservationBalancePaid: (id: string) => Promise<void>;
 
   // Événements
   addEvent: (e: Omit<PrivateEvent, "id" | "createdAt" | "status" | "media" | "gallery">) => Promise<PrivateEvent>;
@@ -1085,6 +1093,11 @@ export const useAppStore = create<AppState>()(
               tax_gst: r.taxGst,
               tax_qst: r.taxQst,
               total: r.total,
+              type: r.type || 'Terrain',
+              guests: r.guests,
+              payment_option: r.paymentOption,
+              amount_paid: r.amountPaid,
+              balance_due: r.balanceDue,
               status: 'confirmed'
             }])
             .select()
@@ -1111,6 +1124,28 @@ export const useAppStore = create<AppState>()(
           await get().syncReservations();
         } catch (error) {
           console.error('❌ Erreur setReservationStatus:', error);
+          throw error;
+        }
+      },
+
+      markReservationBalancePaid: async (id) => {
+        try {
+          const r = get().reservations.find((x) => x.id === id);
+          if (!r) throw new Error('Réservation introuvable');
+          const paidTotal = r.total ?? (r.amountPaid ?? 0) + (r.balanceDue ?? 0);
+          const { error } = await supabase
+            .from('reservations')
+            .update({
+              amount_paid: paidTotal,
+              balance_due: 0,
+              balance_paid_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+          if (error) throw error;
+          await get().syncReservations();
+        } catch (error) {
+          console.error('❌ Erreur markReservationBalancePaid:', error);
           throw error;
         }
       },

@@ -95,3 +95,74 @@ export async function saveTaxSettings(settings: TaxSettings): Promise<void> {
   const { error } = await supabase.from("settings").upsert(rows, { onConflict: "key" });
   if (error) throw error;
 }
+
+/* ===================== Acompte (paiement partiel) ===================== */
+
+export interface PaymentSettings {
+  /** Pourcentage payé à la réservation (ex. 65). */
+  depositPercent: number;
+  /** Sous-total minimum (avant taxes) pour offrir l'option acompte. */
+  depositMinSubtotal: number;
+}
+
+export const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
+  depositPercent: 65,
+  depositMinSubtotal: 200,
+};
+
+const PAY_KEYS = {
+  depositPercent: "deposit_percent",
+  depositMinSubtotal: "deposit_min_subtotal",
+} as const;
+
+/** Charge les réglages d'acompte depuis Supabase, avec repli sur les défauts. */
+export async function loadPaymentSettings(): Promise<PaymentSettings> {
+  try {
+    const { data, error } = await supabase
+      .from("settings")
+      .select("key, value")
+      .in("key", Object.values(PAY_KEYS));
+
+    if (error) throw error;
+
+    const map = new Map<string, unknown>(
+      (data || []).map((row: { key: string; value: unknown }): [string, unknown] => [row.key, row.value])
+    );
+    const num = (key: string, fallback: number) => {
+      const parsed = Number(map.get(key));
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+    };
+
+    return {
+      depositPercent: num(PAY_KEYS.depositPercent, DEFAULT_PAYMENT_SETTINGS.depositPercent),
+      depositMinSubtotal: num(PAY_KEYS.depositMinSubtotal, DEFAULT_PAYMENT_SETTINGS.depositMinSubtotal),
+    };
+  } catch (error) {
+    console.error("❌ Erreur loadPaymentSettings (repli sur les défauts):", error);
+    return { ...DEFAULT_PAYMENT_SETTINGS };
+  }
+}
+
+/** Enregistre les réglages d'acompte (upsert clé/valeur). */
+export async function savePaymentSettings(settings: PaymentSettings): Promise<void> {
+  const rows = [
+    { key: PAY_KEYS.depositPercent, value: String(settings.depositPercent) },
+    { key: PAY_KEYS.depositMinSubtotal, value: String(settings.depositMinSubtotal) },
+  ];
+  const { error } = await supabase.from("settings").upsert(rows, { onConflict: "key" });
+  if (error) throw error;
+}
+
+/** L'option acompte est-elle offerte pour ce sous-total ? */
+export function depositEligible(subtotal: number, settings: PaymentSettings): boolean {
+  return subtotal >= settings.depositMinSubtotal;
+}
+
+/** Acompte et solde calculés sur le total taxes incluses (somme exacte). */
+export function computeDeposit(
+  total: number,
+  settings: PaymentSettings
+): { deposit: number; balance: number } {
+  const deposit = round2(total * (settings.depositPercent / 100));
+  return { deposit, balance: round2(total - deposit) };
+}

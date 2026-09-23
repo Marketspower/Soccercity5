@@ -47,6 +47,45 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+      const isDeposit = metadata.paymentOption === "deposit";
+      const balanceTxt = isDeposit
+        ? ` Solde à régler le jour de l'événement, avant l'accès au terrain : ${Number(metadata.balanceDue).toFixed(2)} $.`
+        : "";
+
+      // ===== Inscription à l'académie (pas une réservation datée) =====
+      if (metadata.kind === "academie") {
+        const { error: academyError } = await supabaseAdmin
+          .from("academy_enrollments")
+          .insert({
+            group_key: metadata.groupKey,
+            group_label: metadata.groupLabel,
+            schedule: metadata.schedule,
+            user_name: metadata.userName,
+            user_email: metadata.userEmail,
+            user_phone: metadata.userPhone,
+            price: Number(metadata.price),
+            tax_gst: Number(metadata.taxGst),
+            tax_qst: Number(metadata.taxQst),
+            total: Number(metadata.total),
+            payment_option: metadata.paymentOption || "full",
+            amount_paid: Number(metadata.amountPaid || metadata.total),
+            balance_due: Number(metadata.balanceDue || 0),
+            status: "confirmed",
+          });
+        if (academyError) throw academyError;
+
+        await Promise.allSettled([
+          sendSMS(
+            metadata.userPhone,
+            `Soccer City : inscription à l'académie confirmée ! ${metadata.groupLabel} — ${metadata.schedule}. Payé : ${Number(metadata.amountPaid).toFixed(2)} $.${balanceTxt}`
+          ),
+          sendAdminSMS(
+            `Nouvelle inscription académie : ${metadata.userName} — ${metadata.groupLabel}. Payé ${Number(metadata.amountPaid).toFixed(2)} $${isDeposit ? `, solde ${Number(metadata.balanceDue).toFixed(2)} $` : ""}.`
+          ),
+        ]);
+        return NextResponse.json({ received: true });
+      }
+
       // 1. Créer la réservation (end_date renseigné uniquement si multi-jours)
       const { data: reservation, error: reservationError } = await supabaseAdmin
         .from("reservations")
@@ -62,6 +101,11 @@ export async function POST(req: NextRequest) {
           tax_gst: metadata.taxGst ? Number(metadata.taxGst) : null,
           tax_qst: metadata.taxQst ? Number(metadata.taxQst) : null,
           total: metadata.total ? Number(metadata.total) : null,
+          type: metadata.type || "Terrain",
+          guests: metadata.guests ? Number(metadata.guests) : null,
+          payment_option: metadata.paymentOption || "full",
+          amount_paid: metadata.amountPaid ? Number(metadata.amountPaid) : null,
+          balance_due: metadata.balanceDue ? Number(metadata.balanceDue) : 0,
           status: "confirmed",
         })
         .select()
@@ -99,7 +143,7 @@ export async function POST(req: NextRequest) {
         date: metadata.date,
         startTime: metadata.startTime,
         endTime: metadata.endTime,
-        price: Number(metadata.total || metadata.price),
+        price: Number(metadata.amountPaid || metadata.total || metadata.price),
       };
 
       await Promise.allSettled([
@@ -107,10 +151,10 @@ export async function POST(req: NextRequest) {
         sendAdminNotificationEmail(emailParams),
         sendSMS(
           metadata.userPhone,
-          `Soccer City : réservation confirmée ! ${metadata.fieldName}, ${metadata.date} de ${metadata.startTime} à ${metadata.endTime}. Montant : ${metadata.total || metadata.price} $ (taxes incluses).`
+          `Soccer City : réservation confirmée ! ${metadata.fieldName}, ${metadata.date} de ${metadata.startTime} à ${metadata.endTime}. Payé : ${Number(metadata.amountPaid || metadata.total).toFixed(2)} $ (taxes incluses).${balanceTxt}`
         ),
         sendAdminSMS(
-          `Nouvelle réservation payée : ${metadata.userName} — ${metadata.fieldName}, ${metadata.date} ${metadata.startTime}-${metadata.endTime}. ${metadata.total || metadata.price} $ TTC.`
+          `Nouvelle réservation payée : ${metadata.userName} — ${metadata.fieldName}, ${metadata.date} ${metadata.startTime}-${metadata.endTime}. Payé ${Number(metadata.amountPaid || metadata.total).toFixed(2)} $${isDeposit ? `, solde ${Number(metadata.balanceDue).toFixed(2)} $ à percevoir` : ""}.`
         ),
       ]);
     } catch (error) {

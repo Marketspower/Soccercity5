@@ -31,6 +31,7 @@ export default function AdminReservations() {
     events,
     setReservationStatus,
     setEventStatus,
+    markReservationBalancePaid,
     loadInitialData,
     isInitialized,
   } = useAppStore();
@@ -310,6 +311,9 @@ export default function AdminReservations() {
         booking={selected}
         onClose={() => setSelectedId(null)}
         onSetStatus={handleSetStatus}
+        onMarkBalancePaid={(b) => {
+          if (b.source === "reservation") markReservationBalancePaid(b.refId);
+        }}
       />
     </div>
   );

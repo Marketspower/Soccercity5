@@ -9,7 +9,18 @@ import { DatePicker } from "./date-picker";
 import { TimeRangePicker, type TimeRangeValue } from "./time-range-picker";
 import { MultiDayPicker, type MultiDayValue } from "./multi-day-picker";
 import { computeDurationHours, formatDuration, computeSpanHours, formatSpanDuration } from "@/lib/time-utils";
-import { computeTaxes, loadTaxSettings, DEFAULT_TAX_SETTINGS, type TaxSettings } from "@/lib/taxes";
+import {
+  computeTaxes,
+  computeDeposit,
+  loadTaxSettings,
+  loadPaymentSettings,
+  DEFAULT_TAX_SETTINGS,
+  DEFAULT_PAYMENT_SETTINGS,
+  type TaxSettings,
+  type PaymentSettings,
+} from "@/lib/taxes";
+import { PaymentOptions } from "@/components/booking/payment-options";
+import type { PaymentOption } from "@/lib/types";
 
 type Mode = "single" | "multi";
 
@@ -30,10 +41,13 @@ export function BookingFlow() {
 
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
+  const [paySettings, setPaySettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
+  const [payOption, setPayOption] = useState<PaymentOption>("full");
 
-  // Taux de taxes configurés dans l'admin (repli sur TPS 5 % / TVQ 9,975 %)
+  // Taux de taxes et réglages d'acompte configurés dans l'admin
   useEffect(() => {
     loadTaxSettings().then(setTaxSettings).catch(() => {});
+    loadPaymentSettings().then(setPaySettings).catch(() => {});
   }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -81,6 +95,7 @@ export function BookingFlow() {
               userName: form.name,
               userEmail: form.email,
               userPhone: form.phone,
+              paymentOption: payOption,
             }
           : {
               fieldId: selectedField.id,
@@ -93,6 +108,7 @@ export function BookingFlow() {
               userName: form.name,
               userEmail: form.email,
               userPhone: form.phone,
+              paymentOption: payOption,
             };
 
       const res = await fetch("/api/checkout", {
@@ -284,6 +300,16 @@ export function BookingFlow() {
           />
         </div>
 
+        {/* ===== Totalité ou acompte (65 % dès 200 $ de réservation) ===== */}
+        <div className="mt-5">
+          <PaymentOptions
+            taxes={taxes}
+            settings={paySettings}
+            value={payOption}
+            onChange={setPayOption}
+          />
+        </div>
+
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
         <button
@@ -292,7 +318,11 @@ export function BookingFlow() {
           disabled={loading}
           className="mt-6 w-full rounded-md bg-primary py-3 font-bold text-white transition-opacity disabled:opacity-60"
         >
-          {loading ? "Redirection vers le paiement…" : `Payer ${taxes.total.toFixed(2)} $`}
+          {loading
+            ? "Redirection vers le paiement…"
+            : payOption === "deposit" && taxes.subtotal >= paySettings.depositMinSubtotal
+              ? `Payer l'acompte de ${computeDeposit(taxes.total, paySettings).deposit.toFixed(2)} $`
+              : `Payer ${taxes.total.toFixed(2)} $`}
         </button>
       </div>
     );

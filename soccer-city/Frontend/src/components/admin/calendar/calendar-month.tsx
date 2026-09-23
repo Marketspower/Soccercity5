@@ -110,6 +110,7 @@ export function CalendarMonth({ monthDate, bookings, onSelect, onShowDay }: Prop
                     ].join(" ")}
                     style={{ backgroundColor: typeBg(b.type), borderLeftColor: cfg.color }}
                   >
+                    {(b.balanceDue ?? 0) > 0 ? "🟠 " : ""}
                     {b.startTime ? `${b.startTime.slice(0, 5)} · ` : ""}
                     {b.client}
                   </button>
