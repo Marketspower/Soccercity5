@@ -77,7 +77,7 @@ export default function AdminPricing() {
           <li key={f.id} className="rounded-lg border bg-card p-5">
             <p className="font-display text-lg font-bold">{f.name}</p>
             <p className="text-xs text-muted-foreground">
-              {f.dimensions} · {f.players}
+              {f.players}
             </p>
             <form
               className="mt-4 flex items-center gap-3"

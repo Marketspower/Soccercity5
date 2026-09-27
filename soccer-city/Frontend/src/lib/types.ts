@@ -59,7 +59,7 @@ export interface Field {
   name: string;
   slug: string;
   image: string;
-  dimensions: string;
+  dimensions?: string; // conservé en base mais plus saisi ni affiché
   turf: TurfType;
   lighting: boolean;
   lockerRooms: number;

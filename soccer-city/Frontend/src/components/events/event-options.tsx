@@ -157,7 +157,6 @@ export function EventOptions() {
                   </h3>
 
                   <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-                    <p>Dimensions : {field.dimensions}</p>
                     <p>Surface : {field.turf}</p>
                     <p>Joueurs : {field.players}</p>
                     <p>Éclairage LED : {field.lighting ? "Oui" : "Non"}</p>

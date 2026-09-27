@@ -23,7 +23,6 @@ const EMPTY: Omit<Field, "id" | "created_at"> = {
   name: "", 
   slug: "", 
   image: "", 
-  dimensions: "40 × 20 m",
   turf: "Gazon artificiel", 
   lighting: true, 
   lockerRooms: 2, 
@@ -123,7 +122,6 @@ export default function AdminFields() {
       name: draft.name.trim(),
       slug: draft.name.toLowerCase().replace(/\s+/g, '-'),
       image: draft.image || '',
-      dimensions: draft.dimensions || '40 × 20 m',
       turf: draft.turf || 'Gazon artificiel',
       lighting: draft.lighting ?? true,
       lockerRooms: Number(draft.lockerRooms) || 2,
@@ -201,7 +199,7 @@ export default function AdminFields() {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-xl">{f.name}</h3>
-                  <p className="text-sm text-muted-foreground">{f.dimensions} · {f.players}</p>
+                  <p className="text-sm text-muted-foreground">{f.players}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <Switch
@@ -351,16 +349,6 @@ export default function AdminFields() {
                   value={draft.name} 
                   onChange={(e) => setValue("name", e.target.value)} 
                   placeholder="Terrain Alpha" 
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="f-dim">Dimensions</Label>
-                <Input 
-                  id="f-dim" 
-                  value={draft.dimensions} 
-                  onChange={(e) => setValue("dimensions", e.target.value)} 
-                  placeholder="40 × 20 m" 
                 />
               </div>
 

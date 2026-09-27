@@ -145,7 +145,7 @@ export function BookingFlow() {
             >
               <div className="p-4">
                 <p className="font-bold text-lg">{f.name}</p>
-                <p className="text-xs text-muted-foreground">{f.dimensions} · {f.players} · {f.turf}</p>
+                <p className="text-xs text-muted-foreground">{f.players} · {f.turf}</p>
                 <p className="mt-2 text-primary font-bold">
                   {f.pricePerHour} $<span className="text-xs text-muted-foreground">/h</span>
                 </p>
