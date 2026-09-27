@@ -157,7 +157,6 @@ export function EventOptions() {
                   </h3>
 
                   <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-                    <p>Dimensions : {field.dimensions}</p>
                     <p>Surface : {field.turf}</p>
                     <p>Joueurs : {field.players}</p>
                     <p>Éclairage LED : {field.lighting ? "Oui" : "Non"}</p>
@@ -166,8 +165,7 @@ export function EventOptions() {
                   </div>
 
                   <p className="mt-5 text-xl font-bold text-primary">
-                    {field.pricePerHour} $ / heure{" "}
-                    <span className="text-xs font-medium text-muted-foreground">+ taxes</span>
+                    {field.pricePerHour} $ / heure
                   </p>
 
                   <span className="mt-5 inline-flex items-center font-semibold text-primary">
