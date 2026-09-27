@@ -1,6 +1,6 @@
 // components/booking/booking-flow.tsx
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { startOfToday } from "date-fns";
 import { useAppStore } from "@/lib/store";
 import { toISODate } from "@/lib/utils";
@@ -9,6 +9,18 @@ import { DatePicker } from "./date-picker";
 import { TimeRangePicker, type TimeRangeValue } from "./time-range-picker";
 import { MultiDayPicker, type MultiDayValue } from "./multi-day-picker";
 import { computeDurationHours, formatDuration, computeSpanHours, formatSpanDuration } from "@/lib/time-utils";
+import {
+  computeTaxes,
+  computeDeposit,
+  loadTaxSettings,
+  loadPaymentSettings,
+  DEFAULT_TAX_SETTINGS,
+  DEFAULT_PAYMENT_SETTINGS,
+  type TaxSettings,
+  type PaymentSettings,
+} from "@/lib/taxes";
+import { PaymentOptions } from "@/components/booking/payment-options";
+import type { PaymentOption } from "@/lib/types";
 
 type Mode = "single" | "multi";
 
@@ -28,6 +40,15 @@ export function BookingFlow() {
   });
 
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
+  const [paySettings, setPaySettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
+  const [payOption, setPayOption] = useState<PaymentOption>("full");
+
+  // Taux de taxes et réglages d'acompte configurés dans l'admin
+  useEffect(() => {
+    loadTaxSettings().then(setTaxSettings).catch(() => {});
+    loadPaymentSettings().then(setPaySettings).catch(() => {});
+  }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,6 +71,9 @@ export function BookingFlow() {
     return 0;
   })();
 
+  // Détail des taxes : sous-total (HT) + TPS + TVQ = total payé
+  const taxes = computeTaxes(price, taxSettings);
+
   const handlePay = async () => {
     if (!selectedField || !isReady || price <= 0) return;
     if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
@@ -71,6 +95,7 @@ export function BookingFlow() {
               userName: form.name,
               userEmail: form.email,
               userPhone: form.phone,
+              paymentOption: payOption,
             }
           : {
               fieldId: selectedField.id,
@@ -83,6 +108,7 @@ export function BookingFlow() {
               userName: form.name,
               userEmail: form.email,
               userPhone: form.phone,
+              paymentOption: payOption,
             };
 
       const res = await fetch("/api/checkout", {
@@ -119,7 +145,7 @@ export function BookingFlow() {
             >
               <div className="p-4">
                 <p className="font-bold text-lg">{f.name}</p>
-                <p className="text-xs text-muted-foreground">{f.players}</p>
+                <p className="text-xs text-muted-foreground">{f.dimensions} · {f.players} · {f.turf}</p>
                 <p className="mt-2 text-primary font-bold">
                   {f.pricePerHour} $<span className="text-xs text-muted-foreground">/h</span>
                 </p>
@@ -221,9 +247,34 @@ export function BookingFlow() {
           ← Changer l'horaire
         </button>
         <h2 className="text-2xl font-bold mb-2">Vos coordonnées</h2>
-        <p className="text-muted-foreground mb-6">
-          {summary} · {price.toFixed(2)} $
-        </p>
+        <p className="text-muted-foreground mb-6">{summary}</p>
+
+        {/* ===== Récapitulatif avec taxes ===== */}
+        <div className="mb-6 rounded-lg border bg-card p-4 text-sm">
+          <div className="flex justify-between py-1">
+            <span className="text-muted-foreground">Sous-total</span>
+            <span className="tabular-nums">{taxes.subtotal.toFixed(2)} $</span>
+          </div>
+          <div className="flex justify-between py-1">
+            <span className="text-muted-foreground">TPS ({taxSettings.gstRate} %)</span>
+            <span className="tabular-nums">{taxes.gst.toFixed(2)} $</span>
+          </div>
+          <div className="flex justify-between py-1">
+            <span className="text-muted-foreground">TVQ ({taxSettings.qstRate} %)</span>
+            <span className="tabular-nums">{taxes.qst.toFixed(2)} $</span>
+          </div>
+          <div className="mt-2 flex justify-between border-t pt-2 font-bold">
+            <span>Total</span>
+            <span className="tabular-nums">{taxes.total.toFixed(2)} $ CAD</span>
+          </div>
+          {(taxSettings.gstNumber || taxSettings.qstNumber) && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {taxSettings.gstNumber && <>N° TPS : {taxSettings.gstNumber}</>}
+              {taxSettings.gstNumber && taxSettings.qstNumber && " · "}
+              {taxSettings.qstNumber && <>N° TVQ : {taxSettings.qstNumber}</>}
+            </p>
+          )}
+        </div>
 
         <div className="space-y-4">
           <input
@@ -249,6 +300,16 @@ export function BookingFlow() {
           />
         </div>
 
+        {/* ===== Totalité ou acompte (65 % dès 200 $ de réservation) ===== */}
+        <div className="mt-5">
+          <PaymentOptions
+            taxes={taxes}
+            settings={paySettings}
+            value={payOption}
+            onChange={setPayOption}
+          />
+        </div>
+
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
         <button
@@ -257,7 +318,11 @@ export function BookingFlow() {
           disabled={loading}
           className="mt-6 w-full rounded-md bg-primary py-3 font-bold text-white transition-opacity disabled:opacity-60"
         >
-          {loading ? "Redirection vers le paiement…" : `Payer ${price.toFixed(2)} $`}
+          {loading
+            ? "Redirection vers le paiement…"
+            : payOption === "deposit" && taxes.subtotal >= paySettings.depositMinSubtotal
+              ? `Payer l'acompte de ${computeDeposit(taxes.total, paySettings).deposit.toFixed(2)} $`
+              : `Payer ${taxes.total.toFixed(2)} $`}
         </button>
       </div>
     );

@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { CalendarSearch, CircleParking, DoorOpen, Lightbulb, Sprout, Users, Zap } from "lucide-react";
+import { CalendarSearch, CircleParking, DoorOpen, Lightbulb, Ruler, Sprout, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
@@ -72,6 +72,7 @@ function FieldCard({ field }: { field: Field }) {
         </div>
 
         <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
+          <Spec Icon={Ruler} label={field.dimensions} />
           <Spec Icon={Sprout} label={field.turf} />
           <Spec Icon={Lightbulb} label={field.lighting ? "Éclairage LED" : "Sans éclairage"} />
           <Spec Icon={DoorOpen} label={`${field.lockerRooms} vestiaires`} />

@@ -52,14 +52,14 @@ export interface MediaItem {
   updatedAt: string;
 }
 
-export type TurfType = "Gazon synthétique 5G" | "Gazon synthétique hybride" | "Gazon naturel";
+export type TurfType = "Gazon artificiel" | "Gazon synthétique 5G" | "Gazon synthétique hybride" | "Gazon naturel";
 
 export interface Field {
   id: string;
   name: string;
   slug: string;
   image: string;
-  dimensions?: string; // conservé en base mais plus saisi ni affiché
+  dimensions: string;
   turf: TurfType;
   lighting: boolean;
   lockerRooms: number;
@@ -84,6 +84,11 @@ export interface FieldMediaItem {
 
 export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
+// ✅ Mode de paiement choisi à la réservation :
+// 'full' = totalité payée en ligne, 'deposit' = acompte payé, solde dû
+// avant l'accès au terrain le jour de l'événement.
+export type PaymentOption = "full" | "deposit";
+
 // ✅ endDate optionnel : absent/null = réservation d'un seul jour (inchangé).
 // Renseigné = réservation continue de (date, startTime) à (endDate, endTime).
 export interface Reservation {
@@ -97,6 +102,18 @@ export interface Reservation {
   endTime: string;
   endDate: string | null;
   price: number;
+  // ✅ Taxes calculées au moment du paiement (null pour les anciennes réservations)
+  taxGst: number | null;
+  taxQst: number | null;
+  total: number | null;
+  // ✅ Forfaits : 'Terrain' par défaut, 'Anniversaire' pour une fête
+  type: string;
+  guests: number | null;
+  // ✅ Paiement : null pour les anciennes réservations (considérées payées)
+  paymentOption: PaymentOption | null;
+  amountPaid: number | null;
+  balanceDue: number | null;
+  balancePaidAt: string | null;
   status: ReservationStatus;
   createdAt: string;
 }
