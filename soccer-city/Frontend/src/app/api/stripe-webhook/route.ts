@@ -86,17 +86,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      // 1. Créer la réservation (end_date renseigné uniquement si multi-jours)
+      // 1. Créer la réservation.
+      // end_date est NOT NULL en base (utilisé par booked_range, l'anti-chevauchement) :
+      // pour une réservation d'une journée, end_date = date.
+      // field_id est nécessaire pour que l'anti-chevauchement s'applique par terrain.
       const { data: reservation, error: reservationError } = await supabaseAdmin
         .from("reservations")
         .insert({
+          field_id: metadata.fieldId || null,
           user_name: metadata.userName,
           user_email: metadata.userEmail,
           user_phone: metadata.userPhone,
           date: metadata.date,
           start_time: metadata.startTime,
           end_time: metadata.endTime,
-          end_date: metadata.endDate || null,
+          end_date: metadata.endDate || metadata.date,
           price: Number(metadata.price),
           tax_gst: metadata.taxGst ? Number(metadata.taxGst) : null,
           tax_qst: metadata.taxQst ? Number(metadata.taxQst) : null,
