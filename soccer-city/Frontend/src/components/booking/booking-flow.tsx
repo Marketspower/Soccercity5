@@ -8,6 +8,7 @@ import type { Field } from "@/lib/types";
 import { DatePicker } from "./date-picker";
 import { TimeRangePicker, type TimeRangeValue } from "./time-range-picker";
 import { MultiDayPicker, type MultiDayValue } from "./multi-day-picker";
+import { MultiDatePicker, type MultiDatesValue } from "./multi-date-picker";
 import { computeDurationHours, formatDuration, computeSpanHours, formatSpanDuration } from "@/lib/time-utils";
 import {
   computeTaxes,
@@ -22,7 +23,7 @@ import {
 import { PaymentOptions } from "@/components/booking/payment-options";
 import type { PaymentOption } from "@/lib/types";
 
-type Mode = "single" | "multi";
+type Mode = "single" | "multi" | "dates";
 
 export function BookingFlow() {
   const { fields } = useAppStore();
@@ -37,6 +38,11 @@ export function BookingFlow() {
   // Mode plusieurs jours
   const [multiDay, setMultiDay] = useState<MultiDayValue>({
     startDate: null, startTime: null, endDate: null, endTime: null,
+  });
+
+  // Mode dates au choix (jours non consécutifs, même horaire chaque jour)
+  const [multiDates, setMultiDates] = useState<MultiDatesValue>({
+    dates: [], startTime: null, endTime: null,
   });
 
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
@@ -57,7 +63,9 @@ export function BookingFlow() {
   const isReady =
     mode === "single"
       ? !!range.startTime && !!range.endTime
-      : !!multiDay.startDate && !!multiDay.startTime && !!multiDay.endDate && !!multiDay.endTime;
+      : mode === "multi"
+        ? !!multiDay.startDate && !!multiDay.startTime && !!multiDay.endDate && !!multiDay.endTime
+        : multiDates.dates.length > 0 && !!multiDates.startTime && !!multiDates.endTime;
 
   const price = (() => {
     if (!selectedField) return 0;
@@ -67,6 +75,12 @@ export function BookingFlow() {
     if (mode === "multi" && multiDay.startDate && multiDay.startTime && multiDay.endDate && multiDay.endTime) {
       const hours = computeSpanHours(multiDay.startDate, multiDay.startTime, multiDay.endDate, multiDay.endTime);
       return hours > 0 ? Math.round(hours * selectedField.pricePerHour * 100) / 100 : 0;
+    }
+    if (mode === "dates" && multiDates.dates.length > 0 && multiDates.startTime && multiDates.endTime) {
+      const hoursPerDay = computeDurationHours(multiDates.startTime, multiDates.endTime);
+      return hoursPerDay > 0
+        ? Math.round(hoursPerDay * selectedField.pricePerHour * multiDates.dates.length * 100) / 100
+        : 0;
     }
     return 0;
   })();
@@ -84,7 +98,21 @@ export function BookingFlow() {
     setError("");
     try {
       const payload =
-        mode === "single"
+        mode === "dates"
+          ? {
+              kind: "terrain-dates",
+              fieldId: selectedField.id,
+              fieldName: selectedField.name,
+              dates: multiDates.dates,
+              startTime: multiDates.startTime,
+              endTime: multiDates.endTime,
+              price,
+              userName: form.name,
+              userEmail: form.email,
+              userPhone: form.phone,
+              paymentOption: payOption,
+            }
+          : mode === "single"
           ? {
               fieldId: selectedField.id,
               fieldName: selectedField.name,
@@ -139,6 +167,7 @@ export function BookingFlow() {
                 setSelectedFieldId(f.id);
                 setRange({ startTime: null, endTime: null });
                 setMultiDay({ startDate: null, startTime: null, endDate: null, endTime: null });
+                setMultiDates({ dates: [], startTime: null, endTime: null });
                 setStep(1);
               }}
               className="group overflow-hidden rounded-lg border bg-card text-left transition-all hover:shadow-glow-sm"
@@ -186,6 +215,15 @@ export function BookingFlow() {
           >
             Plusieurs jours (location continue)
           </button>
+          <button
+            type="button"
+            onClick={() => setMode("dates")}
+            className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${
+              mode === "dates" ? "bg-primary text-white" : "text-muted-foreground"
+            }`}
+          >
+            Dates au choix
+          </button>
         </div>
 
         {mode === "single" ? (
@@ -207,7 +245,7 @@ export function BookingFlow() {
               />
             </div>
           </>
-        ) : (
+        ) : mode === "multi" ? (
           <>
             <p className="text-muted-foreground mb-6">
               Le terrain vous sera réservé exclusivement, en continu, du début à la fin de la période.
@@ -216,6 +254,18 @@ export function BookingFlow() {
               pricePerHour={selectedField.pricePerHour}
               value={multiDay}
               onChange={setMultiDay}
+            />
+          </>
+        ) : (
+          <>
+            <p className="text-muted-foreground mb-6">
+              Sélectionnez librement vos jours — dans le mois ou sur plusieurs mois —
+              avec le même horaire chaque jour (ex. tous les vendredis de 18 h à 20 h).
+            </p>
+            <MultiDatePicker
+              pricePerHour={selectedField.pricePerHour}
+              value={multiDates}
+              onChange={setMultiDates}
             />
           </>
         )}
@@ -237,9 +287,11 @@ export function BookingFlow() {
     const summary =
       mode === "single"
         ? `${selectedField.name} · ${toISODate(date)} · ${range.startTime} - ${range.endTime} (${formatDuration(range.startTime!, range.endTime!)})`
-        : `${selectedField.name} · du ${multiDay.startDate} ${multiDay.startTime} au ${multiDay.endDate} ${multiDay.endTime} (${formatSpanDuration(
+        : mode === "multi"
+        ? `${selectedField.name} · du ${multiDay.startDate} ${multiDay.startTime} au ${multiDay.endDate} ${multiDay.endTime} (${formatSpanDuration(
             computeSpanHours(multiDay.startDate!, multiDay.startTime!, multiDay.endDate!, multiDay.endTime!)
-          )})`;
+          )})`
+        : `${selectedField.name} · ${multiDates.dates.length} dates · ${multiDates.startTime} - ${multiDates.endTime} chaque jour`;
 
     return (
       <div className="mx-auto max-w-md">
