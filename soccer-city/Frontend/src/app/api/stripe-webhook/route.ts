@@ -86,6 +86,88 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
+      // ===== Dates au choix : une réservation PAR date sélectionnée =====
+      if (metadata.dates) {
+        const dates: string[] = JSON.parse(metadata.dates);
+        const n = dates.length;
+        const subtotal = Number(metadata.price);
+        // Sous-total réparti par jour (le 1er jour absorbe l'arrondi) ;
+        // taxes/total/montant payé portés par la 1re réservation seulement,
+        // pour que les sommes de l'admin restent justes.
+        const perDay = Math.round((subtotal / n) * 100) / 100;
+        const firstDay = Math.round((subtotal - perDay * (n - 1)) * 100) / 100;
+
+        const rows = dates.map((d, i) => ({
+          field_id: metadata.fieldId || null,
+          user_name: metadata.userName,
+          user_email: metadata.userEmail,
+          user_phone: metadata.userPhone,
+          date: d,
+          start_time: metadata.startTime,
+          end_time: metadata.endTime,
+          end_date: d,
+          price: i === 0 ? firstDay : perDay,
+          tax_gst: i === 0 && metadata.taxGst ? Number(metadata.taxGst) : null,
+          tax_qst: i === 0 && metadata.taxQst ? Number(metadata.taxQst) : null,
+          total: i === 0 && metadata.total ? Number(metadata.total) : null,
+          type: metadata.type || "Terrain",
+          guests: null,
+          payment_option: metadata.paymentOption || "full",
+          amount_paid: i === 0 && metadata.amountPaid ? Number(metadata.amountPaid) : null,
+          balance_due: i === 0 ? Number(metadata.balanceDue || 0) : 0,
+          status: "confirmed",
+        }));
+
+        // Insertion en un seul lot : tout passe, ou rien (l'anti-chevauchement
+        // en base rejette le lot si un créneau a été pris entre-temps).
+        const { data: created, error: datesError } = await supabaseAdmin
+          .from("reservations")
+          .insert(rows)
+          .select();
+        if (datesError) throw datesError;
+
+        const { error: payError } = await supabaseAdmin.from("payments").insert({
+          reservation_id: created![0].id,
+          stripe_session_id: session.id,
+          stripe_payment_intent_id: session.payment_intent as string,
+          amount: session.amount_total,
+          currency: session.currency,
+          status: "paid",
+          field_id: metadata.fieldId,
+          user_name: metadata.userName,
+          user_email: metadata.userEmail,
+          user_phone: metadata.userPhone,
+          date: dates[0],
+        });
+        if (payError) throw payError;
+
+        console.log(`✅ ${n} réservations (dates au choix) enregistrées`);
+
+        const datesTxt = dates.join(", ");
+        const emailParams = {
+          userName: metadata.userName,
+          userEmail: metadata.userEmail,
+          userPhone: metadata.userPhone,
+          fieldName: metadata.fieldName,
+          date: `${n} dates : ${datesTxt}`,
+          startTime: metadata.startTime,
+          endTime: metadata.endTime,
+          price: Number(metadata.amountPaid || metadata.total || metadata.price),
+        };
+        await Promise.allSettled([
+          sendReservationConfirmationEmail(emailParams),
+          sendAdminNotificationEmail(emailParams),
+          sendSMS(
+            metadata.userPhone,
+            `Soccer City : réservation confirmée ! ${metadata.fieldName}, ${n} dates (${datesTxt}), de ${metadata.startTime} à ${metadata.endTime} chaque jour. Payé : ${Number(metadata.amountPaid || metadata.total).toFixed(2)} $ (taxes incluses).${balanceTxt}`
+          ),
+          sendAdminSMS(
+            `Nouvelle réservation payée : ${metadata.userName} — ${metadata.fieldName}, ${n} dates (${datesTxt}) ${metadata.startTime}-${metadata.endTime}. Payé ${Number(metadata.amountPaid || metadata.total).toFixed(2)} $${isDeposit ? `, solde ${Number(metadata.balanceDue).toFixed(2)} $ à percevoir` : ""}.`
+          ),
+        ]);
+        return NextResponse.json({ received: true });
+      }
+
       // 1. Créer la réservation.
       // end_date est NOT NULL en base (utilisé par booked_range, l'anti-chevauchement) :
       // pour une réservation d'une journée, end_date = date.
