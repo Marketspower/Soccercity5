@@ -103,6 +103,52 @@ export async function POST(req: NextRequest) {
           { status: 409 }
         );
       }
+    } else if (kind === "terrain-dates") {
+      // Location de terrain sur plusieurs dates AU CHOIX (non consécutives),
+      // même horaire chaque jour. Une réservation par date sera créée au webhook.
+      const dates: string[] = Array.isArray(body.dates) ? body.dates : [];
+      if (!fieldId || dates.length === 0 || !startTime || !endTime || !price) {
+        return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+      }
+      if (dates.length > 30) {
+        return NextResponse.json(
+          { error: "Maximum 30 dates par réservation." },
+          { status: 400 }
+        );
+      }
+
+      // Conflits vérifiés côté serveur pour chaque date (même terrain + blocages).
+      const { data: clash } = await supabaseAdmin
+        .from("reservations")
+        .select("date")
+        .eq("field_id", fieldId)
+        .in("date", dates)
+        .neq("status", "cancelled")
+        .lt("start_time", endTime)
+        .gt("end_time", startTime);
+      const { data: blocked } = await supabaseAdmin
+        .from("availability")
+        .select("date")
+        .in("date", dates)
+        .lt("start_time", endTime)
+        .gt("end_time", startTime);
+      const conflictDates = Array.from(
+        new Set([...(clash ?? []), ...(blocked ?? [])].map((r: any) => String(r.date)))
+      );
+      if (conflictDates.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Ces dates viennent d'être réservées sur cet horaire : ${conflictDates.join(
+              ", "
+            )}. Retirez-les ou changez d'horaire.`,
+          },
+          { status: 409 }
+        );
+      }
+
+      subtotal = Number(price);
+      label = `Réservation ${fieldName} — ${dates.length} dates de ${startTime} à ${endTime}`;
+      metaExtra.dates = JSON.stringify([...dates].sort());
     } else {
       // Location de terrain (flux existant)
       if (!fieldId || !date || !startTime || !endTime || !price) {
