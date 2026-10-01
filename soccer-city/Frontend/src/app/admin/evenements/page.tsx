@@ -11,7 +11,8 @@ import type { EventStatus } from "@/lib/types";
 const STATUS_LABEL: Record<EventStatus, string> = { 
   new: "Nouvelle", 
   accepted: "Acceptée", 
-  declined: "Refusée" 
+  declined: "Refusée",
+  expired: "Expirée",
 };
 
 export default function AdminEvents() {
@@ -42,6 +43,7 @@ export default function AdminEvents() {
             <option value="new">Nouvelles</option>
             <option value="accepted">Acceptées</option>
             <option value="declined">Refusées</option>
+            <option value="expired">Expirées</option>
           </Select>
         </div>
       </header>

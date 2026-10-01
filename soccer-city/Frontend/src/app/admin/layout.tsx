@@ -108,6 +108,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link href="/admin/evenements" className="text-white/70 hover:bg-white/10 rounded-md px-3 py-2 text-sm transition-colors">
                 🎉 Événements
               </Link>
+              <Link href="/admin/comptabilite" className="text-white/70 hover:bg-white/10 rounded-md px-3 py-2 text-sm transition-colors">
+                📊 Comptabilité
+              </Link>
               <Link href="/admin/tarifs" className="text-white/70 hover:bg-white/10 rounded-md px-3 py-2 text-sm transition-colors">
                 💰 Tarifs
               </Link>

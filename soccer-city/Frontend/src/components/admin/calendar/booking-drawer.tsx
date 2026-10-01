@@ -1,7 +1,7 @@
 // components/admin/calendar/booking-drawer.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,18 @@ interface Props {
   booking: CalendarBooking | null;
   onClose: () => void;
   onSetStatus: (booking: CalendarBooking, status: ReservationStatus) => void;
-  /** Marque le solde (acompte) comme réglé — réservations uniquement. */
-  onMarkBalancePaid?: (booking: CalendarBooking) => void;
+  /** Encaisse le solde (acompte) — réservations uniquement. */
+  onMarkBalancePaid?: (
+    booking: CalendarBooking,
+    info: { method: "terminal" | "cash" | "virement"; reference?: string }
+  ) => void;
 }
+
+const BALANCE_METHODS = [
+  { value: "terminal", label: "💳 Terminal (carte)" },
+  { value: "cash", label: "💵 Comptant" },
+  { value: "virement", label: "🏦 Virement" },
+] as const;
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -35,6 +44,17 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid }: Props) {
+  const [collecting, setCollecting] = useState(false);
+  const [method, setMethod] = useState<"terminal" | "cash" | "virement">("terminal");
+  const [reference, setReference] = useState("");
+
+  // Réinitialise le mini-formulaire quand on change de réservation
+  useEffect(() => {
+    setCollecting(false);
+    setMethod("terminal");
+    setReference("");
+  }, [booking?.id]);
+
   useEffect(() => {
     if (!booking) return;
     const onKey = (e: KeyboardEvent) => {
@@ -155,18 +175,65 @@ export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid
                   {formatCAD(booking.balanceDue as number)}
                 </p>
                 {booking.source === "reservation" && onMarkBalancePaid && (
-                  <Button
-                    className="mt-2 w-full"
-                    variant="outline"
-                    onClick={() => onMarkBalancePaid(booking)}
-                  >
-                    <Check className="mr-1.5 size-4 text-pitch" /> Marquer le solde comme payé
-                  </Button>
+                  collecting ? (
+                    <div className="mt-3 space-y-2.5 rounded-md border border-white/10 bg-background/60 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Encaisser le solde
+                      </p>
+                      <select
+                        value={method}
+                        onChange={(e) => setMethod(e.target.value as typeof method)}
+                        className="w-full rounded-md border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+                      >
+                        {BALANCE_METHODS.map((m) => (
+                          <option key={m.value} value={m.value}>{m.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        value={reference}
+                        onChange={(e) => setReference(e.target.value)}
+                        placeholder="N° du reçu du terminal (recommandé)"
+                        className="w-full rounded-md border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1"
+                          onClick={() => onMarkBalancePaid(booking, { method, reference: reference.trim() || undefined })}
+                        >
+                          <Check className="mr-1.5 size-4" />
+                          Confirmer {formatCAD(booking.balanceDue as number)}
+                        </Button>
+                        <Button variant="outline" onClick={() => setCollecting(false)}>
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      className="mt-2 w-full"
+                      variant="outline"
+                      onClick={() => setCollecting(true)}
+                    >
+                      <Check className="mr-1.5 size-4 text-pitch" /> Encaisser le solde
+                    </Button>
+                  )
                 )}
               </div>
             ) : (
-              <div className="rounded-lg border border-pitch/40 bg-pitch/10 p-3 text-sm font-bold text-pitch">
-                ✅ Payé en totalité — accès direct au terrain
+              <div className="rounded-lg border border-pitch/40 bg-pitch/10 p-3 text-sm">
+                <p className="font-bold text-pitch">✅ Payé en totalité — accès direct au terrain</p>
+                {booking.balancePaidAt && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Solde finalisé le{" "}
+                    {new Date(booking.balancePaidAt).toLocaleDateString("fr-CA", {
+                      day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                    })}
+                    {booking.balanceMethod === "terminal" && " · 💳 Terminal"}
+                    {booking.balanceMethod === "cash" && " · 💵 Comptant"}
+                    {booking.balanceMethod === "virement" && " · 🏦 Virement"}
+                    {booking.balanceReference && ` · reçu ${booking.balanceReference}`}
+                  </p>
+                )}
               </div>
             )
           )}

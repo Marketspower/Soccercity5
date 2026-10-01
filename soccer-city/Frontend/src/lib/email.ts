@@ -147,3 +147,99 @@ export async function sendEventRequestAdminNotificationEmail(params: EventReques
     console.error("❌ Erreur envoi courriel notification admin (événement):", error);
   }
 }
+// ============================================
+// DEMANDES D'ÉVÉNEMENT — rappel et expiration (cron quotidien)
+// ============================================
+
+interface EventRequestLifecycleParams {
+  userName: string;
+  userEmail: string;
+  eventType: string;
+  eventDate: string;
+  guests?: number;
+  expiresLabel?: string;
+}
+
+/** Rappel au client : sa demande est en attente, avec la date limite. */
+export async function sendEventRequestReminderEmail(params: EventRequestLifecycleParams) {
+  const { userName, userEmail, eventType, eventDate, guests, expiresLabel } = params;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: userEmail,
+      subject: "Votre demande d'événement Soccer City — toujours d'actualité ? 🎉",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #111;">
+          <h1 style="color: #1d4ed8; font-size: 22px;">Votre demande est en attente</h1>
+          <p>Bonjour ${userName},</p>
+          <p>Nous avons bien reçu votre demande d'événement et elle est en cours de traitement :</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+            <tr><td style="padding: 8px 0; color: #666;">Type</td><td style="padding: 8px 0; font-weight: bold;">${eventType}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Date souhaitée</td><td style="padding: 8px 0; font-weight: bold;">${eventDate}</td></tr>
+            ${guests ? `<tr><td style="padding: 8px 0; color: #666;">Invités</td><td style="padding: 8px 0; font-weight: bold;">${guests} personne(s)</td></tr>` : ""}
+          </table>
+          <p>Notre équipe vous contactera très bientôt pour finaliser les détails.
+          ${expiresLabel ? `Sans confirmation de part et d'autre d'ici le <strong>${expiresLabel}</strong>, la demande expirera automatiquement afin de libérer la date.` : ""}</p>
+          <p style="color: #666; font-size: 14px;">Une question ? Répondez simplement à ce courriel ou appelez-nous.</p>
+          <p>À bientôt sur le terrain !<br/>L'équipe Soccer City</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error("❌ Erreur courriel rappel demande:", error);
+  }
+}
+
+/** Information au client : sa demande a expiré (sans réponse dans le délai). */
+export async function sendEventRequestExpiredEmail(params: EventRequestLifecycleParams) {
+  const { userName, userEmail, eventType, eventDate } = params;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: userEmail,
+      subject: "Votre demande d'événement Soccer City a expiré",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #111;">
+          <h1 style="color: #b45309; font-size: 22px;">Demande expirée</h1>
+          <p>Bonjour ${userName},</p>
+          <p>Votre demande d'événement <strong>${eventType}</strong> pour le <strong>${eventDate}</strong>
+          n'a pas pu être finalisée dans les délais et vient d'expirer.</p>
+          <p>Votre projet tient toujours ? Il suffit de refaire une demande sur notre site
+          ou de nous appeler directement — nous nous ferons un plaisir de l'organiser.</p>
+          <p style="color: #666; font-size: 14px;">835 Rue Saint-Jacques, Saint-Jean-sur-Richelieu, QC J3B 2N2</p>
+          <p>À bientôt !<br/>L'équipe Soccer City</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error("❌ Erreur courriel expiration demande:", error);
+  }
+}
+
+/** Alerte à l'admin : une demande attend une réponse et expirera bientôt. */
+export async function sendAdminPendingRequestEmail(params: EventRequestLifecycleParams) {
+  if (!ADMIN_EMAIL) return;
+  const { userName, userEmail, eventType, eventDate, expiresLabel } = params;
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: ADMIN_EMAIL,
+      subject: `⏰ Demande d'événement sans réponse — ${userName} (${eventType})`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #111;">
+          <h1 style="color: #b45309; font-size: 20px;">Demande en attente de réponse</h1>
+          <p>La demande suivante n'a pas encore été traitée dans l'admin :</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+            <tr><td style="padding: 8px 0; color: #666;">Client</td><td style="padding: 8px 0; font-weight: bold;">${userName} (${userEmail})</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Type</td><td style="padding: 8px 0; font-weight: bold;">${eventType}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666;">Date souhaitée</td><td style="padding: 8px 0; font-weight: bold;">${eventDate}</td></tr>
+            ${expiresLabel ? `<tr><td style="padding: 8px 0; color: #666;">Expire le</td><td style="padding: 8px 0; font-weight: bold; color: #b45309;">${expiresLabel}</td></tr>` : ""}
+          </table>
+          <p>Acceptez ou refusez-la dans l'admin avant son expiration automatique.</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error("❌ Erreur courriel alerte admin:", error);
+  }
+}

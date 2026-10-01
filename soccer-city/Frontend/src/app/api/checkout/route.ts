@@ -104,6 +104,8 @@ export async function POST(req: NextRequest) {
         );
       }
     } else if (kind === "terrain-dates") {
+      // ⛔ ANTI-FRAUDE : le prix envoyé par le navigateur n'est JAMAIS utilisé.
+      // On recharge le terrain et on recalcule le sous-total côté serveur.
       // Location de terrain sur plusieurs dates AU CHOIX (non consécutives),
       // même horaire chaque jour. Une réservation par date sera créée au webhook.
       const dates: string[] = Array.isArray(body.dates) ? body.dates : [];
@@ -146,19 +148,47 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      subtotal = Number(price);
-      label = `Réservation ${fieldName} — ${dates.length} dates de ${startTime} à ${endTime}`;
+      const { data: fld } = await supabaseAdmin
+        .from("fields")
+        .select("name, price_per_hour")
+        .eq("id", fieldId)
+        .single();
+      if (!fld) {
+        return NextResponse.json({ error: "Terrain introuvable" }, { status: 400 });
+      }
+      const hoursPerDay = hoursBetween(startTime, endTime);
+      if (hoursPerDay <= 0 || hoursPerDay > 15) {
+        return NextResponse.json({ error: "Horaire invalide" }, { status: 400 });
+      }
+      subtotal = round2(hoursPerDay * Number(fld.price_per_hour) * dates.length);
+      label = `Réservation ${fld.name} — ${dates.length} dates de ${startTime} à ${endTime}`;
       metaExtra.dates = JSON.stringify([...dates].sort());
     } else {
-      // Location de terrain (flux existant)
-      if (!fieldId || !date || !startTime || !endTime || !price) {
+      // Location de terrain (1 jour ou période continue)
+      // ⛔ ANTI-FRAUDE : prix recalculé côté serveur depuis la table fields.
+      if (!fieldId || !date || !startTime || !endTime) {
         return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
       }
-      subtotal = Number(price);
+      const { data: fld } = await supabaseAdmin
+        .from("fields")
+        .select("name, price_per_hour")
+        .eq("id", fieldId)
+        .single();
+      if (!fld) {
+        return NextResponse.json({ error: "Terrain introuvable" }, { status: 400 });
+      }
       const isMultiDay = !!endDate && endDate !== date;
+      const hours = isMultiDay
+        ? (new Date(`${endDate}T${endTime}:00`).getTime() -
+            new Date(`${date}T${startTime}:00`).getTime()) / 3_600_000
+        : hoursBetween(startTime, endTime);
+      if (hours <= 0 || hours > 24 * 31) {
+        return NextResponse.json({ error: "Période invalide" }, { status: 400 });
+      }
+      subtotal = round2(hours * Number(fld.price_per_hour));
       label = isMultiDay
-        ? `Réservation ${fieldName} — du ${date} ${startTime} au ${endDate} ${endTime}`
-        : `Réservation ${fieldName} — ${date} de ${startTime} à ${endTime}`;
+        ? `Réservation ${fld.name} — du ${date} ${startTime} au ${endDate} ${endTime}`
+        : `Réservation ${fld.name} — ${date} de ${startTime} à ${endTime}`;
     }
 
     // ===== 2) Taxes + option de paiement (validée côté serveur) =====
@@ -218,4 +248,14 @@ export async function POST(req: NextRequest) {
     console.error("❌ Erreur création session Stripe:", error);
     return NextResponse.json({ error: error.message || "Erreur serveur" }, { status: 500 });
   }
+}
+
+// ===== Helpers =====
+function hoursBetween(start: string, end: string): number {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  return (eh * 60 + em - (sh * 60 + sm)) / 60;
+}
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

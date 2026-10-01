@@ -16,11 +16,12 @@ export async function fetchBookedRanges(
 ): Promise<{ startTime: string; endTime: string }[]> {
   const iso = toISODate(date);
 
+  // Vue busy_slots : expose uniquement les heures occupées, jamais les
+  // coordonnées des clients (confidentialité).
   const { data: reservationsData, error: reservationsError } = await supabase
-    .from("reservations")
+    .from("busy_slots")
     .select("start_time, end_time")
-    .eq("date", iso)
-    .neq("status", "cancelled");
+    .eq("date", iso);
 
   if (reservationsError) {
     console.error("❌ Erreur fetchBookedRanges (reservations):", reservationsError);
@@ -66,10 +67,9 @@ export async function fetchSlots(date: Date): Promise<Slot[]> {
   const iso = toISODate(date);
 
   const { data: reservationsData, error: reservationsError } = await supabase
-    .from("reservations")
+    .from("busy_slots")
     .select("start_time, end_time")
-    .eq("date", iso)
-    .neq("status", "cancelled");
+    .eq("date", iso);
 
   if (reservationsError) {
     console.error("❌ Erreur fetchSlots (reservations):", reservationsError);
@@ -131,9 +131,8 @@ export interface BookedSpan {
 
 export async function fetchBookedSpans(fromDate: string, toDate: string): Promise<BookedSpan[]> {
   const { data: reservationsData, error: reservationsError } = await supabase
-    .from("reservations")
+    .from("busy_slots")
     .select("date, start_time, end_date, end_time")
-    .neq("status", "cancelled")
     .lte("date", toDate);
 
   if (reservationsError) {
@@ -209,6 +208,9 @@ export async function createReservation(input: {
     amountPaid: taxes.total,
     balanceDue: 0,
     balancePaidAt: null,
+    balanceMethod: null,
+    balanceReference: null,
+    balanceAmount: null,
   });
 
   await supabase.channel('reservations-changes').send({

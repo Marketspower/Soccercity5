@@ -47,6 +47,20 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+      // ===== IDEMPOTENCE =====
+      // Stripe peut livrer le même événement plusieurs fois (renvois manuels,
+      // nouvelles tentatives automatiques). Si cette session de paiement a déjà
+      // été enregistrée, on répond OK sans RIEN recréer — fin des doublons.
+      const { data: alreadyProcessed } = await supabaseAdmin
+        .from("payments")
+        .select("id")
+        .eq("stripe_session_id", session.id)
+        .maybeSingle();
+      if (alreadyProcessed) {
+        console.log("↩️ Événement déjà traité, ignoré:", session.id);
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
       const isDeposit = metadata.paymentOption === "deposit";
       const balanceTxt = isDeposit
         ? ` Solde à régler le jour de l'événement, avant l'accès au terrain : ${Number(metadata.balanceDue).toFixed(2)} $.`
@@ -73,6 +87,21 @@ export async function POST(req: NextRequest) {
             status: "confirmed",
           });
         if (academyError) throw academyError;
+
+        // Trace du paiement (sert aussi de verrou d'idempotence)
+        const { error: academyPayError } = await supabaseAdmin.from("payments").insert({
+          reservation_id: null,
+          stripe_session_id: session.id,
+          stripe_payment_intent_id: session.payment_intent as string,
+          amount: session.amount_total,
+          currency: session.currency,
+          status: "paid",
+          method: "stripe",
+          user_name: metadata.userName,
+          user_email: metadata.userEmail,
+          user_phone: metadata.userPhone,
+        });
+        if (academyPayError) console.error("⚠️ Paiement académie non tracé:", academyPayError);
 
         await Promise.allSettled([
           sendSMS(

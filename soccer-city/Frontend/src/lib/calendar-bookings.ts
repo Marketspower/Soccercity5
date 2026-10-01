@@ -30,6 +30,9 @@ export interface CalendarBooking {
   paymentOption: PaymentOption | null;
   amountPaid: number | null;
   balanceDue: number | null;
+  balancePaidAt: string | null;
+  balanceMethod: "terminal" | "cash" | "virement" | null;
+  balanceReference: string | null;
   guests: number | null;
   message: string | null;
   createdAt: string;
@@ -39,6 +42,7 @@ const EVENT_TO_UNIFIED: Record<PrivateEvent["status"], ReservationStatus> = {
   new: "pending",
   accepted: "confirmed",
   declined: "cancelled",
+  expired: "cancelled",
 };
 
 export const UNIFIED_TO_EVENT: Record<ReservationStatus, PrivateEvent["status"]> = {
@@ -80,6 +84,9 @@ export function buildCalendarBookings(
     paymentOption: r.paymentOption,
     amountPaid: r.amountPaid,
     balanceDue: r.balanceDue,
+    balancePaidAt: r.balancePaidAt ?? null,
+    balanceMethod: r.balanceMethod ?? null,
+    balanceReference: r.balanceReference ?? null,
     guests: r.guests,
     message: null,
     createdAt: r.createdAt,
@@ -93,7 +100,8 @@ export function buildCalendarBookings(
     endDate: null,
     startTime: null,
     endTime: null,
-    client: `${e.firstName} ${e.lastName}`.trim(),
+    // Repli sur le courriel si prénom/nom manquent (évite "undefined undefined")
+    client: [e.firstName, e.lastName].filter(Boolean).join(" ").trim() || e.email || "Demande d'événement",
     phone: e.phone,
     email: e.email,
     company: e.company ?? null,
@@ -106,6 +114,9 @@ export function buildCalendarBookings(
     paymentOption: null,
     amountPaid: null,
     balanceDue: null,
+    balancePaidAt: null,
+    balanceMethod: null,
+    balanceReference: null,
     guests: e.guests,
     message: e.message || null,
     createdAt: e.createdAt,

@@ -114,13 +114,16 @@ export interface Reservation {
   amountPaid: number | null;
   balanceDue: number | null;
   balancePaidAt: string | null;
+  balanceMethod: "terminal" | "cash" | "virement" | null;
+  balanceReference: string | null;
+  balanceAmount: number | null;
   status: ReservationStatus;
   createdAt: string;
 }
 
 export type EventType = "Anniversaire" | "Tournoi" | "Entreprise" | "École" | "Événement privé" | "Compétition";
 
-export type EventStatus = "new" | "accepted" | "declined";
+export type EventStatus = "new" | "accepted" | "declined" | "expired";
 
 export interface PrivateEvent {
   id: string;

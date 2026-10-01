@@ -81,6 +81,9 @@ const mapReservationFromDb = (row: any): Reservation => ({
   amountPaid: row.amount_paid ?? null,
   balanceDue: row.balance_due ?? null,
   balancePaidAt: row.balance_paid_at ?? null,
+  balanceMethod: row.balance_method ?? null,
+  balanceReference: row.balance_reference ?? null,
+  balanceAmount: row.balance_amount ?? null,
   status: row.status,
   createdAt: row.created_at,
 });
@@ -192,7 +195,10 @@ interface AppState {
   addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status" | "userId">) => Promise<Reservation>;
   setReservationStatus: (id: string, status: ReservationStatus) => Promise<void>;
   /** Marque le solde d'une réservation payée en acompte comme réglé (jour J). */
-  markReservationBalancePaid: (id: string) => Promise<void>;
+  markReservationBalancePaid: (
+    id: string,
+    info: { method: "terminal" | "cash" | "virement"; reference?: string }
+  ) => Promise<void>;
 
   // Événements
   addEvent: (e: Omit<PrivateEvent, "id" | "createdAt" | "status" | "media" | "gallery">) => Promise<PrivateEvent>;
@@ -1128,17 +1134,21 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      markReservationBalancePaid: async (id) => {
+      markReservationBalancePaid: async (id, info) => {
         try {
           const r = get().reservations.find((x) => x.id === id);
           if (!r) throw new Error('Réservation introuvable');
-          const paidTotal = r.total ?? (r.amountPaid ?? 0) + (r.balanceDue ?? 0);
+          const balance = r.balanceDue ?? 0;
+          const paidTotal = r.total ?? (r.amountPaid ?? 0) + balance;
           const { error } = await supabase
             .from('reservations')
             .update({
               amount_paid: paidTotal,
               balance_due: 0,
               balance_paid_at: new Date().toISOString(),
+              balance_method: info.method,
+              balance_reference: info.reference || null,
+              balance_amount: balance,
             })
             .eq('id', id);
 

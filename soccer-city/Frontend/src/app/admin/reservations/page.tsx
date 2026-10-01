@@ -54,11 +54,15 @@ export default function AdminReservations() {
   );
   const [dayFilter, setDayFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Par défaut : UNIQUEMENT les réservations payées (table reservations).
+  // Les demandes d'événements (formulaire, sans paiement) restent dans la
+  // page 🎉 Événements ; cette bascule permet de les superposer au besoin.
+  const [includeEventRequests, setIncludeEventRequests] = useState(false);
 
   /* ===== Données unifiées + filtrage ===== */
   const allBookings = useMemo(
-    () => buildCalendarBookings(reservations, events),
-    [reservations, events]
+    () => buildCalendarBookings(reservations, includeEventRequests ? events : []),
+    [reservations, events, includeEventRequests]
   );
 
   const filtered = useMemo(() => {
@@ -237,6 +241,15 @@ export default function AdminReservations() {
           <option value="confirmed">Confirmée</option>
           <option value="cancelled">Annulée</option>
         </Select>
+        <label className="flex cursor-pointer select-none items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground hover:border-white/30">
+          <input
+            type="checkbox"
+            checked={includeEventRequests}
+            onChange={(e) => setIncludeEventRequests(e.target.checked)}
+            className="accent-[var(--accent,#2f6bff)]"
+          />
+          Afficher les demandes d&apos;événements (non payées)
+        </label>
         <Button variant="ghost" onClick={resetFilters}>
           <RotateCcw className="mr-1.5 size-4" /> Réinitialiser
         </Button>
@@ -311,8 +324,8 @@ export default function AdminReservations() {
         booking={selected}
         onClose={() => setSelectedId(null)}
         onSetStatus={handleSetStatus}
-        onMarkBalancePaid={(b) => {
-          if (b.source === "reservation") markReservationBalancePaid(b.refId);
+        onMarkBalancePaid={(b, info) => {
+          if (b.source === "reservation") markReservationBalancePaid(b.refId, info);
         }}
       />
     </div>
