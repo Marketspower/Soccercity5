@@ -9,6 +9,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // RESEND_FROM_EMAIL pour une adresse comme "Soccer City <reservations@soccercity.ca>".
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Soccer City <onboarding@resend.dev>";
 
+// Boîte qui reçoit les RÉPONSES des clients (« Répondre » dans leur messagerie).
+// reservations@soccercity5.com est une adresse d'envoi seulement — sans ceci,
+// les réponses rebondiraient.
+const REPLY_TO = process.env.RESEND_REPLY_TO || "Soccercity5.mtl@gmail.com";
+
 // Adresse qui reçoit une notification à chaque nouvelle réservation/demande.
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL;
 
@@ -33,6 +38,7 @@ export async function sendReservationConfirmationEmail(params: ReservationEmailP
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO,
       to: userEmail,
       subject: "Votre réservation Soccer City est confirmée ⚽",
       html: `
@@ -64,6 +70,7 @@ export async function sendAdminNotificationEmail(params: ReservationEmailParams)
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO,
       to: ADMIN_EMAIL,
       subject: `Nouvelle réservation — ${fieldName} le ${date}`,
       html: `
@@ -102,6 +109,7 @@ export async function sendEventRequestConfirmationEmail(params: EventRequestEmai
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO,
       to: email,
       subject: "Votre demande d'événement a bien été reçue — Soccer City",
       html: `
@@ -132,6 +140,7 @@ export async function sendEventRequestAdminNotificationEmail(params: EventReques
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO,
       to: ADMIN_EMAIL,
       subject: `Nouvelle demande d'événement — ${type}`,
       html: `
@@ -166,6 +175,7 @@ export async function sendEventRequestReminderEmail(params: EventRequestLifecycl
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO,
       to: userEmail,
       subject: "Votre demande d'événement Soccer City — toujours d'actualité ? 🎉",
       html: `
@@ -196,6 +206,7 @@ export async function sendEventRequestExpiredEmail(params: EventRequestLifecycle
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO,
       to: userEmail,
       subject: "Votre demande d'événement Soccer City a expiré",
       html: `
@@ -223,6 +234,7 @@ export async function sendAdminPendingRequestEmail(params: EventRequestLifecycle
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO,
       to: ADMIN_EMAIL,
       subject: `⏰ Demande d'événement sans réponse — ${userName} (${eventType})`,
       html: `
