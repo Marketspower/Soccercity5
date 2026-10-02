@@ -67,3 +67,25 @@ export const ACADEMIE = {
 export function academyGroup(key: string): AcademyGroup | undefined {
   return ACADEMIE.groups.find((g) => g.key === key);
 }
+
+/** ===== Événements réservables en ligne (prix fixe PAR JOUR) ===== */
+/** ⚠️ PRIX À AJUSTER par le client — valeurs de départ indicatives. */
+export interface EventPackage {
+  key: string;
+  label: string;
+  /** Sous-total avant taxes, par jour réservé. */
+  pricePerDay: number;
+  tagline: string;
+}
+
+export const EVENT_PACKAGES: Record<string, EventPackage> = {
+  "Tournoi":          { key: "tournoi",     label: "Tournoi",          pricePerDay: 1200, tagline: "Les deux terrains, arbitrage et tableau des scores" },
+  "Entreprise":       { key: "entreprise",  label: "Entreprise",       pricePerDay: 1500, tagline: "Team building clé en main, espace café privatisé" },
+  "École":            { key: "ecole",       label: "École",            pricePerDay: 900,  tagline: "Journée sportive encadrée pour vos élèves" },
+  "Événement privé":  { key: "prive",       label: "Événement privé",  pricePerDay: 1300, tagline: "Le complexe rien que pour votre groupe" },
+  "Compétition":      { key: "competition", label: "Compétition",      pricePerDay: 1200, tagline: "Structure officielle, classement et récompenses" },
+};
+
+export function eventPackage(type: string): EventPackage | null {
+  return EVENT_PACKAGES[type] ?? null;
+}

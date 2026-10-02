@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { EventForm } from "@/components/events/event-form";
+import { EventBooking } from "@/components/events/event-booking";
+import { eventPackage } from "@/config/packages";
 import type { EventType, GalleryImage, MediaItem } from "@/lib/types";
 
 const EVENT_ICONS: Record<EventType, string> = {
@@ -151,6 +153,9 @@ export function EventDetail({ eventType }: EventDetailProps) {
       autoPlayRef.current = null;
     }
   };
+
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const pkg = eventPackage(eventType);
 
   const icon = EVENT_ICONS[eventType];
   const description = EVENT_DESCRIPTIONS[eventType];
@@ -302,7 +307,8 @@ export function EventDetail({ eventType }: EventDetailProps) {
                   <h2 className="text-2xl font-bold">Réserver un {eventType.toLowerCase()}</h2>
                 </div>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Remplissez le formulaire ci-dessous. Notre équipe vous contactera dans les plus brefs délais.
+                  Choisissez vos dates, payez en ligne — votre événement est confirmé
+                  immédiatement.
                 </p>
 
                 {/* Infos rapides */}
@@ -325,7 +331,45 @@ export function EventDetail({ eventType }: EventDetailProps) {
                   </div>
                 </div>
 
-                <EventForm selectedType={eventType} />
+                {/* ===== Réservation en ligne (ou forfait pour l'anniversaire) ===== */}
+                {eventType === "Anniversaire" ? (
+                  <div className="space-y-3">
+                    <p className="rounded-lg bg-primary/10 px-4 py-3 text-sm">
+                      🎂 L'anniversaire a son <b>forfait tout inclus</b> : 2 h 30
+                      (animation, gâteau et match) à prix fixe.
+                    </p>
+                    <Link
+                      href="/forfaits/anniversaire"
+                      className="block w-full rounded-md bg-primary py-3 text-center font-bold text-white transition-opacity hover:opacity-90"
+                    >
+                      Réserver le forfait anniversaire →
+                    </Link>
+                  </div>
+                ) : pkg ? (
+                  <EventBooking eventType={eventType} pkg={pkg} />
+                ) : (
+                  <EventForm selectedType={eventType} />
+                )}
+
+                {/* ===== Projet sur mesure : l'ancien formulaire de demande ===== */}
+                {eventType !== "Anniversaire" && pkg && (
+                  <div className="mt-6 border-t pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomForm((s) => !s)}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      {showCustomForm
+                        ? "Masquer le formulaire sur mesure"
+                        : "Projet sur mesure (traiteur, très grand groupe…) ? Envoyez-nous une demande →"}
+                    </button>
+                    {showCustomForm && (
+                      <div className="mt-4">
+                        <EventForm selectedType={eventType} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

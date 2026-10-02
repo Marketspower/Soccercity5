@@ -15,7 +15,7 @@ import {
   loadTaxSettings,
   loadPaymentSettings,
 } from "@/lib/taxes";
-import { ANNIVERSAIRE, ACADEMIE, academyGroup } from "@/config/packages";
+import { ANNIVERSAIRE, ACADEMIE, academyGroup, eventPackage } from "@/config/packages";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-07-29.dahlia",
@@ -103,6 +103,52 @@ export async function POST(req: NextRequest) {
           { status: 409 }
         );
       }
+    } else if (kind === "evenement") {
+      // Événement réservé en ligne : PRIX FIXE PAR JOUR (config/packages),
+      // une date ou plusieurs jours, même plage horaire chaque jour.
+      const pkg = eventPackage(String(body.eventType ?? ""));
+      const dates: string[] = Array.isArray(body.dates) ? body.dates : [];
+      if (!pkg || dates.length === 0 || !startTime || !endTime) {
+        return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+      }
+      if (dates.length > 30) {
+        return NextResponse.json({ error: "Maximum 30 jours par réservation." }, { status: 400 });
+      }
+      const hoursPerDay = hoursBetween(startTime, endTime);
+      if (hoursPerDay <= 0 || hoursPerDay > 15) {
+        return NextResponse.json({ error: "Horaire invalide" }, { status: 400 });
+      }
+
+      // Un événement privatise le complexe : conflit avec TOUTE réservation
+      // (quel que soit le terrain) ou blocage sur ces jours/horaire.
+      const { data: clash } = await supabaseAdmin
+        .from("reservations")
+        .select("date")
+        .in("date", dates)
+        .neq("status", "cancelled")
+        .lt("start_time", endTime)
+        .gt("end_time", startTime);
+      const { data: blocked } = await supabaseAdmin
+        .from("availability")
+        .select("date")
+        .in("date", dates)
+        .lt("start_time", endTime)
+        .gt("end_time", startTime);
+      const conflictDates = Array.from(
+        new Set([...(clash ?? []), ...(blocked ?? [])].map((r: any) => String(r.date)))
+      );
+      if (conflictDates.length > 0) {
+        return NextResponse.json(
+          { error: `Ces dates viennent d'être réservées : ${conflictDates.join(", ")}. Retirez-les ou changez d'horaire.` },
+          { status: 409 }
+        );
+      }
+
+      subtotal = round2(pkg.pricePerDay * dates.length);
+      reservationType = String(body.eventType);
+      label = `${reservationType} — ${dates.length} jour(s) de ${startTime} à ${endTime}`;
+      metaExtra.dates = JSON.stringify([...dates].sort());
+      metaExtra.guests = guests ? String(guests) : "";
     } else if (kind === "terrain-dates") {
       // ⛔ ANTI-FRAUDE : le prix envoyé par le navigateur n'est JAMAIS utilisé.
       // On recharge le terrain et on recalcule le sous-total côté serveur.

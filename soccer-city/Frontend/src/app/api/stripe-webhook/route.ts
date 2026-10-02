@@ -115,6 +115,68 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
+      // ===== Paiement d'une demande d'événement acceptée =====
+      if (metadata.kind === "event-request") {
+        const { error: payErr } = await supabaseAdmin.from("payments").insert({
+          reservation_id: null,
+          stripe_session_id: session.id,
+          stripe_payment_intent_id: session.payment_intent as string,
+          amount: session.amount_total,
+          currency: session.currency,
+          status: "paid",
+          method: "stripe",
+          user_name: metadata.userName,
+          user_email: metadata.userEmail,
+          user_phone: metadata.userPhone,
+          date: metadata.date,
+        });
+        if (payErr) throw payErr;
+
+        const { error: evErr } = await supabaseAdmin
+          .from("private_events")
+          .update({ status: "paid", paid_at: new Date().toISOString() })
+          .eq("id", metadata.requestId);
+        if (evErr) console.error("⚠️ Statut demande non mis à jour:", evErr);
+
+        // Si l'admin avait fixé un horaire, on bloque aussi le calendrier
+        // en créant la réservation correspondante.
+        if (metadata.startTime && metadata.endTime) {
+          const { error: resErr } = await supabaseAdmin.from("reservations").insert({
+            field_id: null,
+            user_name: metadata.userName,
+            user_email: metadata.userEmail,
+            user_phone: metadata.userPhone,
+            date: metadata.date,
+            start_time: metadata.startTime,
+            end_time: metadata.endTime,
+            end_date: metadata.date,
+            price: Number(metadata.price),
+            tax_gst: Number(metadata.taxGst),
+            tax_qst: Number(metadata.taxQst),
+            total: Number(metadata.total),
+            type: metadata.type || "Événement privé",
+            guests: metadata.guests ? Number(metadata.guests) : null,
+            payment_option: "full",
+            amount_paid: Number(metadata.total),
+            balance_due: 0,
+            status: "confirmed",
+          });
+          if (resErr) console.error("⚠️ Réservation calendrier non créée:", resErr);
+        }
+
+        await Promise.allSettled([
+          sendSMS(
+            metadata.userPhone,
+            `Soccer City : votre ${metadata.type} du ${metadata.date} est confirmé ! Payé : ${Number(metadata.total).toFixed(2)} $ (taxes incluses). À bientôt !`
+          ),
+          sendAdminSMS(
+            `Événement payé : ${metadata.userName} — ${metadata.type} le ${metadata.date}. ${Number(metadata.total).toFixed(2)} $ encaissés.`
+          ),
+        ]);
+        console.log("✅ Demande d'événement payée:", metadata.requestId);
+        return NextResponse.json({ received: true });
+      }
+
       // ===== Dates au choix : une réservation PAR date sélectionnée =====
       if (metadata.dates) {
         const dates: string[] = JSON.parse(metadata.dates);
@@ -140,7 +202,7 @@ export async function POST(req: NextRequest) {
           tax_qst: i === 0 && metadata.taxQst ? Number(metadata.taxQst) : null,
           total: i === 0 && metadata.total ? Number(metadata.total) : null,
           type: metadata.type || "Terrain",
-          guests: null,
+          guests: metadata.guests ? Number(metadata.guests) : null,
           payment_option: metadata.paymentOption || "full",
           amount_paid: i === 0 && metadata.amountPaid ? Number(metadata.amountPaid) : null,
           balance_due: i === 0 ? Number(metadata.balanceDue || 0) : 0,
