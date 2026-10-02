@@ -16,6 +16,7 @@ import {
   loadPaymentSettings,
 } from "@/lib/taxes";
 import { ANNIVERSAIRE, ACADEMIE, academyGroup, eventPackage } from "@/config/packages";
+import { loadEventPrices } from "@/lib/event-prices";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-07-29.dahlia",
@@ -144,7 +145,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      subtotal = round2(pkg.pricePerDay * dates.length);
+      // Prix/jour lu depuis l'admin (table settings), repli sur la config.
+      const eventPrices = await loadEventPrices();
+      const perDay = eventPrices[String(body.eventType)] ?? pkg.pricePerDay;
+      subtotal = round2(perDay * dates.length);
       reservationType = String(body.eventType);
       label = `${reservationType} — ${dates.length} jour(s) de ${startTime} à ${endTime}`;
       metaExtra.dates = JSON.stringify([...dates].sort());

@@ -27,6 +27,7 @@ import {
 import { PaymentOptions } from "@/components/booking/payment-options";
 import type { EventType, PaymentOption } from "@/lib/types";
 import type { EventPackage } from "@/config/packages";
+import { loadEventPrices } from "@/lib/event-prices";
 
 const OPENING = "08:00";
 const CLOSING = "23:00";
@@ -63,10 +64,16 @@ export function EventBooking({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Prix/jour modifiable depuis l'admin (Tarifs) — repli sur la config
+  const [pricePerDay, setPricePerDay] = useState(pkg.pricePerDay);
+
   useEffect(() => {
     loadTaxSettings().then(setTaxSettings).catch(() => {});
     loadPaymentSettings().then(setPaySettings).catch(() => {});
-  }, []);
+    loadEventPrices()
+      .then((p) => setPricePerDay(p[eventType] ?? pkg.pricePerDay))
+      .catch(() => {});
+  }, [eventType, pkg.pricePerDay]);
 
   const sorted = useMemo(() => [...dates].sort(), [dates]);
 
@@ -101,7 +108,7 @@ export function EventBooking({
     );
   }, [sorted, bookedSpans, startTime, endTime]);
 
-  const subtotal = Math.round(pkg.pricePerDay * sorted.length * 100) / 100;
+  const subtotal = Math.round(pricePerDay * sorted.length * 100) / 100;
   const taxes = computeTaxes(subtotal, taxSettings);
   const ready =
     sorted.length > 0 && !!startTime && !!endTime && conflictDates.length === 0;
@@ -148,7 +155,7 @@ export function EventBooking({
     return (
       <div className="space-y-4">
         <p className="rounded-lg bg-primary/10 px-4 py-2.5 text-sm">
-          <b className="text-primary">{pkg.pricePerDay} $ / jour</b>
+          <b className="text-primary">{pricePerDay} $ / jour</b>
           <span className="text-muted-foreground"> (avant taxes) — {pkg.tagline}</span>
         </p>
 
@@ -252,7 +259,7 @@ export function EventBooking({
         {sorted.length > 0 && (
           <div className="rounded-md border bg-card p-4 text-sm">
             <p>
-              <b>{sorted.length} jour{sorted.length > 1 ? "s" : ""}</b> × {pkg.pricePerDay} $
+              <b>{sorted.length} jour{sorted.length > 1 ? "s" : ""}</b> × {pricePerDay} $
               {startTime && endTime ? ` · ${startTime} – ${endTime} chaque jour` : ""}
             </p>
             <p className="mt-1 font-bold text-primary">

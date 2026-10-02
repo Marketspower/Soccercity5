@@ -19,6 +19,13 @@ import {
   type TaxSettings,
   type PaymentSettings,
 } from "@/lib/taxes";
+import { EVENT_PACKAGES } from "@/config/packages";
+import {
+  DEFAULT_EVENT_PRICES,
+  loadEventPrices,
+  saveEventPrices,
+  type EventPrices,
+} from "@/lib/event-prices";
 
 export default function AdminPricing() {
   const { fields, updateField } = useAppStore();
@@ -31,10 +38,27 @@ export default function AdminPricing() {
   const [pay, setPay] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [payState, setPayState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
+  // ===== Prix par jour des événements réservables en ligne =====
+  const [eventPrices, setEventPrices] = useState<EventPrices>(DEFAULT_EVENT_PRICES);
+  const [eventState, setEventState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
   useEffect(() => {
     loadTaxSettings().then(setTaxes).catch(() => {});
     loadPaymentSettings().then(setPay).catch(() => {});
+    loadEventPrices().then(setEventPrices).catch(() => {});
   }, []);
+
+  const handleSaveEventPrices = async () => {
+    setEventState("saving");
+    try {
+      await saveEventPrices(eventPrices);
+      setEventState("saved");
+      setTimeout(() => setEventState("idle"), 1800);
+    } catch (error) {
+      console.error("❌ Erreur enregistrement prix événements:", error);
+      setEventState("error");
+    }
+  };
 
   const handleSavePay = async () => {
     setPayState("saving");
@@ -117,6 +141,62 @@ export default function AdminPricing() {
           </li>
         ))}
       </ul>
+
+      {/* ===== Section Prix des événements (par jour) ===== */}
+      <section className="rounded-lg border bg-card p-6">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🎉</span>
+          <h2 className="text-xl font-bold">Prix des événements (par jour)</h2>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Sous-total avant taxes, par jour réservé. Appliqué immédiatement sur
+          les pages Événements et au paiement. (L&apos;anniversaire a son
+          forfait, les terrains leur tarif horaire ci-dessus.)
+        </p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(EVENT_PACKAGES).map(([type, pkg]) => (
+            <div key={type} className="space-y-1.5">
+              <Label htmlFor={`evp-${pkg.key}`}>{type}</Label>
+              <div className="relative">
+                <Input
+                  id={`evp-${pkg.key}`}
+                  type="number"
+                  min={0}
+                  step={25}
+                  value={eventPrices[type] ?? ""}
+                  onChange={(ev) =>
+                    setEventPrices((prev) => ({ ...prev, [type]: Number(ev.target.value) }))
+                  }
+                  className="pr-16 text-lg font-bold tabular-nums"
+                />
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                  $ / jour
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formatCAD(computeTaxes(eventPrices[type] ?? 0, taxes).total)} taxes incluses
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 flex items-center gap-3">
+          <Button
+            variant={eventState === "saved" ? "pitch" : "brand"}
+            onClick={handleSaveEventPrices}
+            disabled={eventState === "saving"}
+            className="w-44"
+          >
+            {eventState === "saving"
+              ? "Enregistrement…"
+              : eventState === "saved"
+                ? <><Check /> Enregistré</>
+                : "Enregistrer les prix"}
+          </Button>
+          {eventState === "error" && (
+            <span className="text-sm text-destructive">Échec de l&apos;enregistrement.</span>
+          )}
+        </div>
+      </section>
 
       {/* ===== Section Taxes (TPS / TVQ) ===== */}
       <section className="rounded-lg border bg-card p-6">
