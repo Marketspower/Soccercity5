@@ -114,6 +114,11 @@ export function EventBooking({
     sorted.length > 0 && !!startTime && !!endTime && conflictDates.length === 0;
 
   const pay = async () => {
+    // Verrou anti-doublon : jamais de paiement si une date est en conflit
+    if (conflictDates.length > 0) {
+      setError("Une des dates choisies vient d'être réservée. Revenez à l'étape précédente pour la retirer.");
+      return;
+    }
     if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
       setError("Veuillez remplir votre nom, courriel et téléphone.");
       return;
@@ -269,7 +274,9 @@ export function EventBooking({
         )}
 
         <Button variant="brand" className="w-full" disabled={!ready} onClick={() => setStep(1)}>
-          Continuer
+          {conflictDates.length > 0
+            ? "⚠️ Retirez les dates en conflit pour continuer"
+            : "Continuer"}
         </Button>
       </div>
     );
