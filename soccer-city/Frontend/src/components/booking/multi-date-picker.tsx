@@ -42,10 +42,13 @@ export function MultiDatePicker({
   pricePerHour,
   value,
   onChange,
+  onConflictsChange,
 }: {
   pricePerHour: number;
   value: MultiDatesValue;
   onChange: (v: MultiDatesValue) => void;
+  /** Remonte le nombre de dates en conflit au parent (pour bloquer Continuer). */
+  onConflictsChange?: (count: number) => void;
 }) {
   const [month, setMonth] = useState(() => new Date());
   const [bookedSpans, setBookedSpans] = useState<BookedSpan[]>([]);
@@ -95,6 +98,12 @@ export function MultiDatePicker({
       })
     );
   }, [sorted, bookedSpans, value.startTime, value.endTime]);
+
+  // Informe le parent dès que les conflits changent
+  useEffect(() => {
+    onConflictsChange?.(conflictDates.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflictDates.length]);
 
   const hoursPerDay =
     value.startTime && value.endTime

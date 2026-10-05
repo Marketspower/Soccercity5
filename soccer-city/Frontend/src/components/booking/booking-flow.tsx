@@ -44,6 +44,8 @@ export function BookingFlow() {
   const [multiDates, setMultiDates] = useState<MultiDatesValue>({
     dates: [], startTime: null, endTime: null,
   });
+  // Dates en conflit remontées par le calendrier multi-dates
+  const [dateConflicts, setDateConflicts] = useState(0);
 
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
@@ -65,7 +67,8 @@ export function BookingFlow() {
       ? !!range.startTime && !!range.endTime
       : mode === "multi"
         ? !!multiDay.startDate && !!multiDay.startTime && !!multiDay.endDate && !!multiDay.endTime
-        : multiDates.dates.length > 0 && !!multiDates.startTime && !!multiDates.endTime;
+        : multiDates.dates.length > 0 && !!multiDates.startTime && !!multiDates.endTime &&
+          dateConflicts === 0;
 
   const price = (() => {
     if (!selectedField) return 0;
@@ -90,6 +93,10 @@ export function BookingFlow() {
 
   const handlePay = async () => {
     if (!selectedField || !isReady || price <= 0) return;
+    if (mode === "dates" && dateConflicts > 0) {
+      setError("Une des dates choisies vient d'être réservée. Retirez-la avant de payer.");
+      return;
+    }
     if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
       setError("Veuillez remplir tous les champs.");
       return;
@@ -266,6 +273,7 @@ export function BookingFlow() {
               pricePerHour={selectedField.pricePerHour}
               value={multiDates}
               onChange={setMultiDates}
+              onConflictsChange={setDateConflicts}
             />
           </>
         )}
@@ -276,7 +284,9 @@ export function BookingFlow() {
           onClick={() => setStep(2)}
           className="mt-8 w-full rounded-md bg-primary py-3 font-bold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Continuer
+          {mode === "dates" && dateConflicts > 0
+            ? "⚠️ Retirez les dates en conflit pour continuer"
+            : "Continuer"}
         </button>
       </div>
     );
