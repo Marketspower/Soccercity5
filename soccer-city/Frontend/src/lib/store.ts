@@ -99,6 +99,41 @@ const mapBlockedFromDb = (row: any): BlockedSlot => ({
   reason: row.reason,
 });
 
+// ✅ Mapping de l'événement joint (private_events) → camelCase
+const mapJoinedEvent = (e: any) =>
+  e
+    ? { id: e.id, firstName: e.first_name, lastName: e.last_name, type: e.type }
+    : null;
+
+// ✅ Mapping snake_case (Supabase) → camelCase pour la galerie
+// (les composants lisent imageUrl/sortOrder : sans cette conversion,
+//  l'image existe dans le storage mais ne s'affiche jamais)
+const mapGalleryFromDb = (row: any): GalleryImage => ({
+  id: row.id,
+  imageUrl: row.image_url,
+  alt: row.alt,
+  sortOrder: row.sort_order ?? 0,
+  eventId: row.event_id ?? null,
+  event: mapJoinedEvent(row.event),
+  createdAt: row.created_at,
+});
+
+// ✅ Mapping snake_case (Supabase) → camelCase pour les médias
+const mapMediaFromDb = (row: any): MediaItem => ({
+  id: row.id,
+  title: row.title,
+  url: row.url,
+  type: row.type,
+  thumbnail: row.thumbnail ?? null,
+  duration: row.duration ?? null,
+  description: row.description ?? null,
+  isFeatured: row.is_featured ?? false,
+  eventId: row.event_id ?? null,
+  event: mapJoinedEvent(row.event),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
 // ✅ Mapping snake_case (Supabase) → camelCase pour les médias de terrain
 const mapFieldMediaFromDb = (row: any): FieldMediaItem => ({
   id: row.id,
@@ -423,9 +458,9 @@ export const useAppStore = create<AppState>()(
               )
             `)
             .order('sort_order', { ascending: true });
-          
+
           if (error) throw error;
-          set({ gallery: data || [] });
+          set({ gallery: (data || []).map(mapGalleryFromDb) });
         } catch (error) {
           console.error('❌ Erreur syncGallery:', error);
           set({ gallery: [] });
@@ -446,9 +481,9 @@ export const useAppStore = create<AppState>()(
               )
             `)
             .order('created_at', { ascending: false });
-          
+
           if (error) throw error;
-          set({ media: data || [] });
+          set({ media: (data || []).map(mapMediaFromDb) });
         } catch (error) {
           console.error('❌ Erreur syncMedia:', error);
           set({ media: [] });
@@ -810,7 +845,7 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncGallery();
-          return result as GalleryImage;
+          return mapGalleryFromDb(result);
         } catch (error) {
           console.error('❌ Erreur addGalleryImage:', error);
           throw error;
@@ -922,7 +957,7 @@ export const useAppStore = create<AppState>()(
           if (error) throw error;
           
           await get().syncMedia();
-          return result as MediaItem;
+          return mapMediaFromDb(result);
         } catch (error) {
           console.error('❌ Erreur addMediaItem:', error);
           throw error;
