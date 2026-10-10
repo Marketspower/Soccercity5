@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Groupe inconnu" }, { status: 400 });
       }
       subtotal = ACADEMIE.price;
-      label = `Académie — ${group.label} (${group.schedule}) — 1 ${ACADEMIE.period}`;
+      label = `Académie — ${group.label} (${group.schedule}) — ${ACADEMIE.period}`;
       metaExtra.groupKey = group.key;
       metaExtra.groupLabel = group.label;
       metaExtra.schedule = group.schedule;

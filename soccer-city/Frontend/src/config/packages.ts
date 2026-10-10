@@ -31,14 +31,14 @@ export interface AcademyGroup {
 export const ACADEMIE = {
   key: "academie",
   label: "Académie",
-  /** Sous-total avant taxes, par mois. */
+  /** Sous-total avant taxes, par session de 10 semaines. */
   price: 460,
-  period: "mois",
+  period: "10 semaines",
   sessionsPerWeek: 2,
   seance: [
     { duration: "10 min", label: "Échauffement" },
     { duration: "20 min", label: "Exercices techniques" },
-    { duration: "30 min", label: "Match dirigé" },
+    { duration: "30 min", label: "Match" },
   ],
   objectifs:
     "Développer la technique, le contrôle du ballon, les passes et la conduite de balle avec les deux pieds (gauche et droit), tout en travaillant le jeu collectif et la prise de décision.",

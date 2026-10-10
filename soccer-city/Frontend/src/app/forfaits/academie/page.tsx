@@ -89,6 +89,23 @@ export default function AcademiePage() {
           entraînements par semaine. {ACADEMIE.objectifs}
         </p>
 
+        {/* ===== Déroulement d'une séance ===== */}
+        <div className="mt-5 rounded-xl border bg-card/60 p-4">
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Déroulement d&apos;une séance
+          </p>
+          <ul className="space-y-1.5 text-sm">
+            {ACADEMIE.seance.map((s) => (
+              <li key={s.label} className="flex items-center gap-3">
+                <span className="w-16 shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-center text-[11px] font-bold text-primary">
+                  {s.duration}
+                </span>
+                <span>{s.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {/* ===== Étape 1 : le groupe ===== */}
         <h2 className="mt-8 mb-3 text-lg font-bold">1. Choisissez votre groupe</h2>
         <div className="space-y-3">
@@ -147,7 +164,7 @@ export default function AcademiePage() {
               </div>
               <div className="mt-2 border-t pt-2">
                 <div className="flex justify-between py-0.5">
-                  <span className="text-muted-foreground">Sous-total (1 {ACADEMIE.period})</span>
+                  <span className="text-muted-foreground">Sous-total ({ACADEMIE.period})</span>
                   <span>{fmt(taxes.subtotal)}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
