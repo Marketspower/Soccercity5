@@ -327,7 +327,7 @@ export function EventDetail({ eventType }: EventDetailProps) {
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <MapPin className="size-4 text-primary" />
-                    <span>Saint-Constant</span>
+                    <span>Saint-Jean-sur-Richelieu</span>
                   </div>
                 </div>
 
