@@ -7,7 +7,6 @@ import Link from "next/link";
 import { 
   ArrowLeft, 
   Calendar, 
-  Users, 
   Phone, 
   Mail, 
   MapPin, 
@@ -303,10 +302,6 @@ export function EventDetail({ eventType }: EventDetailProps) {
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="size-4 text-primary" />
                     <span>Réponse sous 24h</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Users className="size-4 text-primary" />
-                    <span>Jusqu'à 500 pers.</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="size-4 text-primary" />
