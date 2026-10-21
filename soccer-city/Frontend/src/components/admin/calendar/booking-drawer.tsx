@@ -6,6 +6,7 @@ import { Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCAD } from "@/lib/utils";
+import { loadTaxSettings, DEFAULT_TAX_SETTINGS, type TaxSettings } from "@/lib/taxes";
 import { BOOKING_TYPES } from "@/config/reservation-types";
 import {
   parseISODate,
@@ -23,6 +24,20 @@ interface Props {
   onMarkBalancePaid?: (
     booking: CalendarBooking,
     info: { method: "terminal" | "cash" | "virement"; reference?: string }
+  ) => void;
+  /** Enregistre le montant + un paiement à l'accueil sur une réservation
+   *  ajoutée par l'admin qui n'a pas encore de prix. */
+  onRecordPayment?: (
+    booking: CalendarBooking,
+    payment: {
+      subtotal: number;
+      gst: number;
+      qst: number;
+      total: number;
+      received: number;
+      method: "terminal" | "cash" | "virement";
+      reference?: string;
+    }
   ) => void;
 }
 
@@ -43,16 +58,34 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid }: Props) {
+export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid, onRecordPayment }: Props) {
   const [collecting, setCollecting] = useState(false);
   const [method, setMethod] = useState<"terminal" | "cash" | "virement">("terminal");
   const [reference, setReference] = useState("");
+  // Encaissement d'un paiement (réservation accueil sans montant)
+  const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
+  const [paying, setPaying] = useState(false);
+  const [amountStr, setAmountStr] = useState("");
+  const [ttc, setTtc] = useState(true);
+  const [receivedStr, setReceivedStr] = useState("");
+  const [payMethod, setPayMethod] = useState<"terminal" | "cash" | "virement">("cash");
+  const [payReference, setPayReference] = useState("");
 
-  // Réinitialise le mini-formulaire quand on change de réservation
+  useEffect(() => {
+    loadTaxSettings().then(setTaxSettings).catch(() => {});
+  }, []);
+
+  // Réinitialise les mini-formulaires quand on change de réservation
   useEffect(() => {
     setCollecting(false);
     setMethod("terminal");
     setReference("");
+    setPaying(false);
+    setAmountStr("");
+    setTtc(true);
+    setReceivedStr("");
+    setPayMethod("cash");
+    setPayReference("");
   }, [booking?.id]);
 
   useEffect(() => {
@@ -67,6 +100,33 @@ export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid
   if (!booking) return null;
 
   const cfg = BOOKING_TYPES[booking.type];
+
+  // ===== Calculs pour l'encaissement accueil (réservation sans montant) =====
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const amount = Number(amountStr.replace(",", "."));
+  const rate = (taxSettings.gstRate + taxSettings.qstRate) / 100;
+  const breakdown =
+    Number.isFinite(amount) && amount > 0
+      ? (() => {
+          const subtotalRaw = ttc ? amount / (1 + rate) : amount;
+          const gst = r2((subtotalRaw * taxSettings.gstRate) / 100);
+          const qst = r2((subtotalRaw * taxSettings.qstRate) / 100);
+          const total = ttc ? r2(amount) : r2(subtotalRaw + gst + qst);
+          return { subtotal: r2(total - gst - qst), gst, qst, total };
+        })()
+      : null;
+  const received = breakdown
+    ? receivedStr.trim() === ""
+      ? breakdown.total
+      : r2(Number(receivedStr.replace(",", ".")))
+    : 0;
+  const receivedValid =
+    !!breakdown && Number.isFinite(received) && received >= 0 && received <= breakdown.total;
+  const needsPricing =
+    booking.source === "reservation" &&
+    booking.addedByAdmin &&
+    (booking.total ?? 0) === 0 &&
+    booking.status !== "cancelled";
 
   return (
     <>
@@ -153,7 +213,7 @@ export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid
               {booking.email}
             </a>
           </Row>
-          {booking.price !== null && booking.total !== null ? (
+          {needsPricing ? null : booking.price !== null && booking.total !== null ? (
             <>
               <Row label="Sous-total">{formatCAD(booking.price)}</Row>
               {booking.taxGst !== null && <Row label="TPS">{formatCAD(booking.taxGst)}</Row>}
@@ -166,8 +226,95 @@ export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid
             booking.price !== null && <Row label="Montant">{formatCAD(booking.price)}</Row>
           )}
 
+          {/* ===== Encaisser un paiement (réservation accueil sans montant) ===== */}
+          {needsPricing && onRecordPayment && (
+            <div className="rounded-lg border border-primary/40 bg-primary/10 p-3.5 text-sm">
+              <p className="font-bold text-primary">💰 Aucun montant enregistré</p>
+              {paying ? (
+                <div className="mt-3 space-y-2.5 rounded-md border border-white/10 bg-background/60 p-3">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <input
+                      inputMode="decimal"
+                      value={amountStr}
+                      onChange={(e) => setAmountStr(e.target.value)}
+                      placeholder="Prix convenu ($)"
+                      className="w-full rounded-md border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                    <select
+                      value={ttc ? "ttc" : "ht"}
+                      onChange={(e) => setTtc(e.target.value === "ttc")}
+                      className="w-full rounded-md border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+                    >
+                      <option value="ttc">taxes incluses</option>
+                      <option value="ht">avant taxes</option>
+                    </select>
+                  </div>
+                  {breakdown && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Sous-total {breakdown.subtotal.toFixed(2)} $ · TPS {breakdown.gst.toFixed(2)} $ ·
+                      TVQ {breakdown.qst.toFixed(2)} $ · <b>Total {breakdown.total.toFixed(2)} $</b>
+                    </p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <input
+                      inputMode="decimal"
+                      value={receivedStr}
+                      onChange={(e) => setReceivedStr(e.target.value)}
+                      placeholder={breakdown ? `Reçu : ${breakdown.total.toFixed(2)}` : "Reçu maintenant ($)"}
+                      className="w-full rounded-md border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                    <select
+                      value={payMethod}
+                      onChange={(e) => setPayMethod(e.target.value as typeof payMethod)}
+                      className="w-full rounded-md border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+                    >
+                      {BALANCE_METHODS.map((m) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <input
+                    value={payReference}
+                    onChange={(e) => setPayReference(e.target.value)}
+                    placeholder="N° de reçu / référence (optionnel)"
+                    className="w-full rounded-md border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  {breakdown && receivedValid && received < breakdown.total && (
+                    <p className="text-[11px] font-semibold text-amber-400">
+                      🟠 Solde à percevoir : {(breakdown.total - received).toFixed(2)} $
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      disabled={!breakdown || !receivedValid}
+                      onClick={() =>
+                        breakdown &&
+                        onRecordPayment(booking, {
+                          ...breakdown,
+                          received,
+                          method: payMethod,
+                          reference: payReference.trim() || undefined,
+                        })
+                      }
+                    >
+                      <Check className="mr-1.5 size-4" /> Enregistrer
+                    </Button>
+                    <Button variant="outline" onClick={() => setPaying(false)}>
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button className="mt-2 w-full" variant="outline" onClick={() => setPaying(true)}>
+                  💰 Encaisser un paiement
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* ===== Paiement : totalité ou acompte + solde ===== */}
-          {booking.paymentOption && (
+          {booking.paymentOption && !needsPricing && (
             (booking.balanceDue ?? 0) > 0 ? (
               <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3.5 text-sm">
                 <p className="font-bold text-amber-500">

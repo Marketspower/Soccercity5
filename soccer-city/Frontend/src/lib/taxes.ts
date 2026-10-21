@@ -53,6 +53,26 @@ const KEYS = {
 } as const;
 
 /** Charge les réglages de taxes depuis Supabase, avec repli sur les défauts. */
+/** Décompose un montant TAXES INCLUSES en sous-total + TPS + TVQ.
+ *  (l'inverse de computeTaxes — utilisé pour les paiements à l'accueil
+ *  quand l'admin saisit le total payé par le client). */
+export function splitTaxesFromTotal(
+  total: number,
+  settings: TaxSettings = DEFAULT_TAX_SETTINGS
+): TaxBreakdown {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const divisor = 1 + (settings.gstRate + settings.qstRate) / 100;
+  const subtotalRaw = total / divisor;
+  const gst = r2((subtotalRaw * settings.gstRate) / 100);
+  const qst = r2((subtotalRaw * settings.qstRate) / 100);
+  return {
+    subtotal: r2(total - gst - qst),
+    gst,
+    qst,
+    total: r2(total),
+  };
+}
+
 export async function loadTaxSettings(): Promise<TaxSettings> {
   try {
     const { data, error } = await supabase

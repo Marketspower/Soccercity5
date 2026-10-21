@@ -16,6 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAppStore } from "@/lib/store";
+import {
+  loadTaxSettings,
+  DEFAULT_TAX_SETTINGS,
+  type TaxSettings,
+} from "@/lib/taxes";
 import { BOOKING_TYPES, BOOKING_TYPE_KEYS } from "@/config/reservation-types";
 import { generateTimeOptions, timeToMinutes, rangesOverlap } from "@/lib/time-utils";
 import { parseISODate, toISODate, bookingDays, type CalendarBooking } from "@/lib/calendar-bookings";
@@ -91,6 +96,18 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
   const [recurFreq, setRecurFreq] = useState<RecurFreq>("none");
   const [recurStart, setRecurStart] = useState("");
   const [recurEnd, setRecurEnd] = useState("");
+  // Montant et encaissement à l'accueil
+  const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
+  const [amountStr, setAmountStr] = useState("");
+  const [amountIncludesTax, setAmountIncludesTax] = useState(true);
+  /** Montant reçu maintenant — vide = la totalité ; 0 = rien (tout en solde). */
+  const [receivedStr, setReceivedStr] = useState("");
+  const [payMethod, setPayMethod] = useState<"cash" | "terminal" | "virement">("cash");
+  const [payReference, setPayReference] = useState("");
+
+  useEffect(() => {
+    loadTaxSettings().then(setTaxSettings).catch(() => {});
+  }, []);
 
   // À l'ouverture : repartir de zéro avec la date double-cliquée.
   useEffect(() => {
@@ -102,6 +119,11 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
     setRecurFreq("none");
     setRecurStart(initialDate ?? "");
     setRecurEnd("");
+    setAmountStr("");
+    setAmountIncludesTax(true);
+    setReceivedStr("");
+    setPayMethod("cash");
+    setPayReference("");
     setFirstName("");
     setLastName("");
     setPhone("");
@@ -149,12 +171,38 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
     });
   };
 
+  // Détail des taxes à partir du montant saisi (TTC ou avant taxes)
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const amount = Number(amountStr.replace(",", "."));
+  const hasAmount = Number.isFinite(amount) && amount > 0;
+  const breakdown = useMemo(() => {
+    if (!hasAmount) return null;
+    const rate = (taxSettings.gstRate + taxSettings.qstRate) / 100;
+    const subtotal = amountIncludesTax ? r2(amount / (1 + rate)) : r2(amount);
+    const gst = r2(subtotal * (taxSettings.gstRate / 100));
+    const qst = r2(subtotal * (taxSettings.qstRate / 100));
+    // En TTC, le total est EXACTEMENT le montant saisi (le sous-total absorbe l'arrondi)
+    const total = amountIncludesTax ? r2(amount) : r2(subtotal + gst + qst);
+    return { subtotal: amountIncludesTax ? r2(total - gst - qst) : subtotal, gst, qst, total };
+  }, [hasAmount, amount, amountIncludesTax, taxSettings]);
+
+  // Montant reçu maintenant : vide = totalité ; doit être entre 0 et le total
+  const received = breakdown
+    ? receivedStr.trim() === ""
+      ? breakdown.total
+      : r2(Number(receivedStr.replace(",", ".")))
+    : 0;
+  const receivedValid =
+    !breakdown || (Number.isFinite(received) && received >= 0 && received <= breakdown.total);
+  const remaining = breakdown ? r2(breakdown.total - received) : 0;
+
   const ready =
     sorted.length > 0 &&
     !!startTime &&
     !!endTime &&
     firstName.trim().length > 0 &&
     phone.trim().length > 0 &&
+    receivedValid &&
     (conflictDates.length === 0 || force);
 
   const handleConfirm = async () => {
@@ -172,6 +220,14 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
         email,
         type,
         notes,
+        payment: breakdown
+          ? {
+              ...breakdown,
+              received,
+              method: payMethod,
+              reference: payReference.trim() || undefined,
+            }
+          : null,
       });
       onClose();
     } catch (err: any) {
@@ -379,6 +435,105 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Ex. : payé comptant à l'accueil, contact du coach…"
             />
+          </div>
+
+          {/* ===== Montant et paiement à l'accueil ===== */}
+          <div className="rounded-lg border bg-card p-3">
+            <Label className="mb-2 block">💰 Montant et paiement (optionnel)</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Prix convenu ($)</Label>
+                <Input
+                  inputMode="decimal"
+                  value={amountStr}
+                  onChange={(e) => setAmountStr(e.target.value)}
+                  placeholder="Ex. : 250"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Ce montant…</Label>
+                <Select
+                  value={amountIncludesTax ? "ttc" : "ht"}
+                  onChange={(e) => setAmountIncludesTax(e.target.value === "ttc")}
+                >
+                  <option value="ttc">inclut les taxes (TTC)</option>
+                  <option value="ht">est avant taxes (+ TPS/TVQ)</option>
+                </Select>
+              </div>
+            </div>
+
+            {breakdown && (
+              <>
+                <div className="mt-3 rounded-md border border-white/10 bg-background/60 p-3 text-xs">
+                  <div className="flex justify-between py-0.5">
+                    <span className="text-muted-foreground">Sous-total</span>
+                    <span>{breakdown.subtotal.toFixed(2)} $</span>
+                  </div>
+                  <div className="flex justify-between py-0.5">
+                    <span className="text-muted-foreground">TPS ({taxSettings.gstRate} %)</span>
+                    <span>{breakdown.gst.toFixed(2)} $</span>
+                  </div>
+                  <div className="flex justify-between py-0.5">
+                    <span className="text-muted-foreground">TVQ ({taxSettings.qstRate} %)</span>
+                    <span>{breakdown.qst.toFixed(2)} $</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/10 pt-1 font-bold">
+                    <span>Total</span>
+                    <span>{breakdown.total.toFixed(2)} $</span>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Reçu maintenant ($)</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={receivedStr}
+                      onChange={(e) => setReceivedStr(e.target.value)}
+                      placeholder={`${breakdown.total.toFixed(2)} (totalité)`}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Méthode</Label>
+                    <Select
+                      value={payMethod}
+                      onChange={(e) => setPayMethod(e.target.value as typeof payMethod)}
+                    >
+                      <option value="cash">💵 Comptant</option>
+                      <option value="terminal">💳 Terminal (carte)</option>
+                      <option value="virement">🏦 Virement</option>
+                    </Select>
+                  </div>
+                </div>
+                {received > 0 && (
+                  <Input
+                    className="mt-2"
+                    value={payReference}
+                    onChange={(e) => setPayReference(e.target.value)}
+                    placeholder="N° de reçu / référence (optionnel)"
+                  />
+                )}
+                {!receivedValid ? (
+                  <p className="mt-2 text-xs text-destructive">
+                    Le montant reçu doit être entre 0 et {breakdown.total.toFixed(2)} $.
+                  </p>
+                ) : remaining > 0 ? (
+                  <p className="mt-2 text-xs font-semibold text-amber-400">
+                    🟠 Solde à percevoir : {remaining.toFixed(2)} $ — suivi dans la fiche et en
+                    Comptabilité, encaissable plus tard.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs font-semibold text-pitch">
+                    ✅ Payé en totalité ({payMethod === "cash" ? "comptant" : payMethod === "terminal" ? "terminal" : "virement"}).
+                  </p>
+                )}
+              </>
+            )}
+            {!breakdown && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Laissez vide pour une réservation sans montant (interne, maintenance…).
+              </p>
+            )}
           </div>
 
           {/* ===== Avertissement de conflit ===== */}

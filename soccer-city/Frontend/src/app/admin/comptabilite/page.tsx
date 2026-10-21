@@ -106,9 +106,22 @@ export default function ComptabilitePage() {
     Math.round(xs.reduce((a: number, x) => a + (Number(x) || 0), 0) * 100) / 100;
 
   const onlineStripe = sum(payments.filter((p) => !p.method || p.method === "stripe").map((p) => (p.amount ?? 0) / 100));
-  const balTerminal = sum(balancesCollected.filter((b) => b.balance_method === "terminal").map((b) => b.balance_amount));
-  const balCash = sum(balancesCollected.filter((b) => b.balance_method === "cash").map((b) => b.balance_amount));
-  const balVirement = sum(balancesCollected.filter((b) => b.balance_method === "virement").map((b) => b.balance_amount));
+  // Encaissements à l'accueil = soldes finalisés (réservations, balance_*)
+  // + paiements saisis à l'accueil (table payments, method cash/terminal/virement)
+  const payByMethod = (m: string) =>
+    sum(payments.filter((p) => p.method === m).map((p) => (p.amount ?? 0) / 100));
+  const balTerminal = sum([
+    sum(balancesCollected.filter((b) => b.balance_method === "terminal").map((b) => b.balance_amount)),
+    payByMethod("terminal"),
+  ]);
+  const balCash = sum([
+    sum(balancesCollected.filter((b) => b.balance_method === "cash").map((b) => b.balance_amount)),
+    payByMethod("cash"),
+  ]);
+  const balVirement = sum([
+    sum(balancesCollected.filter((b) => b.balance_method === "virement").map((b) => b.balance_amount)),
+    payByMethod("virement"),
+  ]);
   const totalEncaisse = sum([onlineStripe, balTerminal, balCash, balVirement]);
 
   const caFacture = sum(reservations.map((r) => r.total ?? r.price));

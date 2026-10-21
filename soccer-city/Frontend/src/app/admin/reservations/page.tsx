@@ -36,6 +36,7 @@ export default function AdminReservations() {
     setReservationStatus,
     setEventStatus,
     markReservationBalancePaid,
+    recordReceptionPayment,
     updateReservationSchedule,
     loadInitialData,
     isInitialized,
@@ -439,6 +440,15 @@ export default function AdminReservations() {
         onSetStatus={handleSetStatus}
         onMarkBalancePaid={(b, info) => {
           if (b.source === "reservation") markReservationBalancePaid(b.refId, info);
+        }}
+        onRecordPayment={(b, payment) => {
+          if (b.source !== "reservation") return;
+          recordReceptionPayment(b.refId, payment, {
+            userName: b.client,
+            userEmail: b.email,
+            userPhone: b.phone,
+            date: b.date,
+          }).catch(() => alert("Impossible d'enregistrer le paiement."));
         }}
       />
     </div>

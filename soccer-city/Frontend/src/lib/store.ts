@@ -101,6 +101,19 @@ const mapBlockedFromDb = (row: any): BlockedSlot => ({
   reason: row.reason,
 });
 
+/** Paiement encaissé à l'accueil (comptant / terminal / virement).
+ *  Les montants sont déjà décomposés (taxes incluses ou ajoutées) par l'UI. */
+export interface ReceptionPayment {
+  subtotal: number;
+  gst: number;
+  qst: number;
+  total: number;
+  /** Montant réellement reçu maintenant (≤ total ; le reste = solde à percevoir). */
+  received: number;
+  method: "cash" | "terminal" | "virement";
+  reference?: string;
+}
+
 // ✅ Mapping de l'événement joint (private_events) → camelCase
 const mapJoinedEvent = (e: any) =>
   e
@@ -242,7 +255,16 @@ interface AppState {
     email?: string;
     type: string;
     notes?: string;
+    /** Montant et encaissement saisis à l'accueil (null = gratuit/interne).
+     *  Porté par la PREMIÈRE date pour ne jamais compter double en compta. */
+    payment?: ReceptionPayment | null;
   }) => Promise<void>;
+  /** Encaisse un paiement à l'accueil sur une réservation existante (fiche). */
+  recordReceptionPayment: (
+    reservationId: string,
+    payment: ReceptionPayment,
+    client: { userName: string; userEmail: string; userPhone: string; date: string }
+  ) => Promise<void>;
   /** Déplace une réservation d'un seul jour (glisser-déposer dans l'agenda). */
   updateReservationSchedule: (
     id: string,
@@ -1176,31 +1198,107 @@ export const useAppStore = create<AppState>()(
 
       addManualReservations: async (data) => {
         const name = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
-        const rows = [...data.dates].sort().map((date) => ({
-          user_name: name,
-          user_email: data.email?.trim() || "",
-          user_phone: data.phone,
-          date,
-          start_time: data.startTime,
-          end_time: data.endTime,
-          end_date: date, // une ligne = un jour (dates au choix)
-          price: 0,
-          tax_gst: 0,
-          tax_qst: 0,
-          total: 0,
-          type: data.type,
-          guests: null,
-          payment_option: 'full',
-          amount_paid: 0,
-          balance_due: 0,
-          status: 'confirmed',
-          source: 'admin',
-          notes: data.notes?.trim() || null,
-        }));
-        const { error } = await supabase.from('reservations').insert(rows);
+        const email = data.email?.trim() || "";
+        const p = data.payment ?? null;
+        const sortedDates = [...data.dates].sort();
+        const rows = sortedDates.map((date, i) => {
+          // Le montant est porté par la PREMIÈRE date uniquement (même
+          // convention que les paiements en ligne multi-dates) : la
+          // Comptabilité ne compte ainsi jamais double.
+          const carries = p !== null && i === 0;
+          const balance = carries ? Math.round((p!.total - p!.received) * 100) / 100 : 0;
+          return {
+            user_name: name,
+            user_email: email,
+            user_phone: data.phone,
+            date,
+            start_time: data.startTime,
+            end_time: data.endTime,
+            end_date: date, // une ligne = un jour (dates au choix)
+            price: carries ? p!.subtotal : 0,
+            tax_gst: carries ? p!.gst : 0,
+            tax_qst: carries ? p!.qst : 0,
+            total: carries ? p!.total : 0,
+            type: data.type,
+            guests: null,
+            // null quand aucun montant : la fiche n'affiche alors pas de bloc paiement
+            payment_option: carries ? (balance > 0 ? 'deposit' : 'full') : null,
+            amount_paid: carries ? p!.received : 0,
+            balance_due: balance,
+            status: 'confirmed',
+            source: 'admin',
+            notes: data.notes?.trim() || null,
+          };
+        });
+        const { data: inserted, error } = await supabase
+          .from('reservations')
+          .insert(rows)
+          .select('id, date');
         if (error) {
           console.error('❌ Erreur addManualReservations:', error);
           throw error;
+        }
+
+        // Argent reçu maintenant → une trace dans payments (comme Stripe),
+        // avec la méthode : c'est elle que lit la Comptabilité (Comptant /
+        // Terminal / Virement). Le solde restant sera encaissé via la fiche.
+        if (p && p.received > 0) {
+          const firstRow = (inserted ?? []).find((r: any) => r.date === sortedDates[0]);
+          const { error: payErr } = await supabase.from('payments').insert([{
+            reservation_id: firstRow?.id ?? null,
+            amount: Math.round(p.received * 100), // en cents, comme Stripe
+            currency: 'cad',
+            status: 'paid',
+            method: p.method,
+            reference: p.reference?.trim() || null,
+            user_name: name,
+            user_email: email,
+            user_phone: data.phone,
+            date: sortedDates[0],
+          }]);
+          if (payErr) {
+            console.error('❌ Erreur trace paiement accueil:', payErr);
+            throw payErr;
+          }
+        }
+        await get().syncReservations();
+      },
+
+      recordReceptionPayment: async (reservationId, p, client) => {
+        const balance = Math.round((p.total - p.received) * 100) / 100;
+        const { error } = await supabase
+          .from('reservations')
+          .update({
+            price: p.subtotal,
+            tax_gst: p.gst,
+            tax_qst: p.qst,
+            total: p.total,
+            payment_option: balance > 0 ? 'deposit' : 'full',
+            amount_paid: p.received,
+            balance_due: balance,
+          })
+          .eq('id', reservationId);
+        if (error) {
+          console.error('❌ Erreur recordReceptionPayment:', error);
+          throw error;
+        }
+        if (p.received > 0) {
+          const { error: payErr } = await supabase.from('payments').insert([{
+            reservation_id: reservationId,
+            amount: Math.round(p.received * 100),
+            currency: 'cad',
+            status: 'paid',
+            method: p.method,
+            reference: p.reference?.trim() || null,
+            user_name: client.userName,
+            user_email: client.userEmail,
+            user_phone: client.userPhone,
+            date: client.date,
+          }]);
+          if (payErr) {
+            console.error('❌ Erreur trace paiement accueil:', payErr);
+            throw payErr;
+          }
         }
         await get().syncReservations();
       },
