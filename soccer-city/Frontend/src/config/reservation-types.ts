@@ -5,8 +5,17 @@
 
 import type { EventType } from "@/lib/types";
 
-/** "Terrain" = réservation de terrain classique ; les autres = événements privés. */
-export type BookingTypeKey = "Terrain" | EventType;
+/** Types supplémentaires disponibles pour les réservations ajoutées à l'accueil. */
+export type AdminBookingType =
+  | "Entraînement"
+  | "Ligue"
+  | "Cours privé"
+  | "Match amical"
+  | "Maintenance / Fermeture";
+
+/** "Terrain" = réservation de terrain classique ; les autres = événements privés
+ *  ou réservations ajoutées manuellement par l'admin. */
+export type BookingTypeKey = "Terrain" | EventType | AdminBookingType;
 
 export interface BookingTypeConfig {
   label: string;
@@ -24,6 +33,11 @@ export const BOOKING_TYPES: Record<BookingTypeKey, BookingTypeConfig> = {
   "École":            { label: "École",            color: "#06b6d4", icon: "🎓" },
   "Entreprise":       { label: "Entreprise",       color: "#6366f1", icon: "💼" },
   "Compétition":      { label: "Compétition",      color: "#ef4444", icon: "🥇" },
+  "Entraînement":     { label: "Entraînement",     color: "#14b8a6", icon: "⚽" },
+  "Ligue":            { label: "Ligue",            color: "#eab308", icon: "🛡️" },
+  "Cours privé":      { label: "Cours privé",      color: "#ec4899", icon: "👟" },
+  "Match amical":     { label: "Match amical",     color: "#84cc16", icon: "🤝" },
+  "Maintenance / Fermeture": { label: "Maintenance / Fermeture", color: "#6b7280", icon: "🔧" },
 };
 
 export const BOOKING_TYPE_KEYS = Object.keys(BOOKING_TYPES) as BookingTypeKey[];

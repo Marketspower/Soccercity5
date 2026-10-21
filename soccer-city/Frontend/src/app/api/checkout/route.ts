@@ -169,11 +169,13 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Conflits vérifiés côté serveur pour chaque date (même terrain + blocages).
+      // Conflits vérifiés côté serveur pour chaque date : même terrain OU
+      // réservation sans terrain précis (field_id null = privatisation du
+      // complexe : anniversaire, événement, réservation ajoutée à l'accueil).
       const { data: clash } = await supabaseAdmin
         .from("reservations")
         .select("date")
-        .eq("field_id", fieldId)
+        .or(`field_id.eq.${fieldId},field_id.is.null`)
         .in("date", dates)
         .neq("status", "cancelled")
         .lt("start_time", endTime)
@@ -228,6 +230,50 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Terrain introuvable" }, { status: 400 });
       }
       const isMultiDay = !!endDate && endDate !== date;
+
+      // Conflits vérifiés côté serveur : même terrain OU réservation sans
+      // terrain précis (field_id null = complexe privatisé, y compris les
+      // réservations ajoutées à l'accueil), plus les blocages manuels.
+      if (!isMultiDay) {
+        const { data: clash } = await supabaseAdmin
+          .from("reservations")
+          .select("id")
+          .or(`field_id.eq.${fieldId},field_id.is.null`)
+          .eq("date", date)
+          .neq("status", "cancelled")
+          .lt("start_time", endTime)
+          .gt("end_time", startTime)
+          .limit(1);
+        const { data: blocked } = await supabaseAdmin
+          .from("availability")
+          .select("id")
+          .eq("date", date)
+          .lt("start_time", endTime)
+          .gt("end_time", startTime)
+          .limit(1);
+        if ((clash?.length ?? 0) > 0 || (blocked?.length ?? 0) > 0) {
+          return NextResponse.json(
+            { error: "Ce créneau vient d'être réservé. Choisissez un autre horaire." },
+            { status: 409 }
+          );
+        }
+      } else {
+        const { data: clash } = await supabaseAdmin
+          .from("reservations")
+          .select("id")
+          .or(`field_id.eq.${fieldId},field_id.is.null`)
+          .gte("date", date)
+          .lte("date", endDate as string)
+          .neq("status", "cancelled")
+          .limit(1);
+        if ((clash?.length ?? 0) > 0) {
+          return NextResponse.json(
+            { error: "Une réservation existe déjà sur cette période. Choisissez d'autres dates." },
+            { status: 409 }
+          );
+        }
+      }
+
       const hours = isMultiDay
         ? (new Date(`${endDate}T${endTime}:00`).getTime() -
             new Date(`${date}T${startTime}:00`).getTime()) / 3_600_000

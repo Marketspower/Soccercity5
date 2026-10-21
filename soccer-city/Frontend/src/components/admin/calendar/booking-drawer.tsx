@@ -105,6 +105,11 @@ export function BookingDrawer({ booking, onClose, onSetStatus, onMarkBalancePaid
             >
               {cfg.icon} {cfg.label}
             </span>
+            {booking.addedByAdmin && (
+              <span className="mt-1 block text-[11px] font-semibold text-amber-400">
+                🖊️ Ajoutée à l&apos;accueil (sans paiement en ligne)
+              </span>
+            )}
           </Row>
           <Row label="Date">
             {parseISODate(booking.date).toLocaleDateString("fr-CA", {

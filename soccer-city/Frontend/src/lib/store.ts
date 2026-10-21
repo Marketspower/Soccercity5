@@ -85,6 +85,8 @@ const mapReservationFromDb = (row: any): Reservation => ({
   balanceReference: row.balance_reference ?? null,
   balanceAmount: row.balance_amount ?? null,
   status: row.status,
+  source: row.source === "admin" ? "admin" : "site",
+  notes: row.notes ?? null,
   createdAt: row.created_at,
 });
 
@@ -227,7 +229,25 @@ interface AppState {
   uploadImage: (file: File, folder?: string, bucket?: string) => Promise<string>;
 
   // Réservations — ✅ userId retiré (jamais réellement inséré en base) et hour → startTime/endTime
-  addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status" | "userId">) => Promise<Reservation>;
+  addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status" | "userId" | "source" | "notes">) => Promise<Reservation>;
+  /** Réservation ajoutée manuellement par l'admin (accueil) : une ligne par
+   *  date choisie, même horaire chaque jour. Bloque le créneau côté public. */
+  addManualReservations: (data: {
+    dates: string[];
+    startTime: string;
+    endTime: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email?: string;
+    type: string;
+    notes?: string;
+  }) => Promise<void>;
+  /** Déplace une réservation d'un seul jour (glisser-déposer dans l'agenda). */
+  updateReservationSchedule: (
+    id: string,
+    s: { date: string; startTime: string; endTime: string }
+  ) => Promise<void>;
   setReservationStatus: (id: string, status: ReservationStatus) => Promise<void>;
   /** Marque le solde d'une réservation payée en acompte comme réglé (jour J). */
   markReservationBalancePaid: (
@@ -1152,6 +1172,54 @@ export const useAppStore = create<AppState>()(
           console.error('❌ Erreur addReservation:', error);
           throw error;
         }
+      },
+
+      addManualReservations: async (data) => {
+        const name = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
+        const rows = [...data.dates].sort().map((date) => ({
+          user_name: name,
+          user_email: data.email?.trim() || "",
+          user_phone: data.phone,
+          date,
+          start_time: data.startTime,
+          end_time: data.endTime,
+          end_date: date, // une ligne = un jour (dates au choix)
+          price: 0,
+          tax_gst: 0,
+          tax_qst: 0,
+          total: 0,
+          type: data.type,
+          guests: null,
+          payment_option: 'full',
+          amount_paid: 0,
+          balance_due: 0,
+          status: 'confirmed',
+          source: 'admin',
+          notes: data.notes?.trim() || null,
+        }));
+        const { error } = await supabase.from('reservations').insert(rows);
+        if (error) {
+          console.error('❌ Erreur addManualReservations:', error);
+          throw error;
+        }
+        await get().syncReservations();
+      },
+
+      updateReservationSchedule: async (id, s) => {
+        const { error } = await supabase
+          .from('reservations')
+          .update({
+            date: s.date,
+            start_time: s.startTime,
+            end_time: s.endTime,
+            end_date: s.date, // réservation d'un seul jour
+          })
+          .eq('id', id);
+        if (error) {
+          console.error('❌ Erreur updateReservationSchedule:', error);
+          throw error;
+        }
+        await get().syncReservations();
       },
 
       setReservationStatus: async (id, status) => {

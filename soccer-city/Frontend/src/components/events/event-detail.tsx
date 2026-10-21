@@ -159,7 +159,6 @@ export function EventDetail({ eventType }: EventDetailProps) {
 
   const icon = EVENT_ICONS[eventType];
   const description = EVENT_DESCRIPTIONS[eventType];
-  const features = EVENT_FEATURES[eventType];
 
   if (isLoading) {
     return (
@@ -284,18 +283,6 @@ export function EventDetail({ eventType }: EventDetailProps) {
               </div>
             )}
 
-            {/* Caractéristiques */}
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-4">Ce qui est inclus</h3>
-              <ul className="grid grid-cols-2 gap-2">
-                {features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="text-primary">✓</span>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
 
           {/* Colonne droite - Formulaire */}

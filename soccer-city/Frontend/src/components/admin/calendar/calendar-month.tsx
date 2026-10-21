@@ -1,10 +1,11 @@
 // components/admin/calendar/calendar-month.tsx
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { BOOKING_TYPES, typeBg } from "@/config/reservation-types";
 import {
   bookingDays,
+  isMultiDay,
   toISODate,
   type CalendarBooking,
 } from "@/lib/calendar-bookings";
@@ -17,10 +18,28 @@ interface Props {
   bookings: CalendarBooking[];
   onSelect: (booking: CalendarBooking) => void;
   onShowDay: (isoDate: string) => void;
+  /** Double-clic sur un jour (façon Google Agenda) : créer une réservation. */
+  onCreateAt?: (isoDate: string) => void;
+  /** Dépôt d'une réservation glissée sur un autre jour (heures conservées). */
+  onMove?: (booking: CalendarBooking, isoDate: string, startTime: string) => void;
 }
 
-export function CalendarMonth({ monthDate, bookings, onSelect, onShowDay }: Props) {
+export function CalendarMonth({ monthDate, bookings, onSelect, onShowDay, onCreateAt, onMove }: Props) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropIso, setDropIso] = useState<string | null>(null);
   const todayIso = toISODate(new Date());
+
+  const canDrag = (b: CalendarBooking) =>
+    !!onMove && b.source === "reservation" && !isMultiDay(b) && !!b.startTime && !!b.endTime;
+
+  const handleDrop = (iso: string) => {
+    setDropIso(null);
+    if (!dragId || !onMove) return;
+    const b = bookings.find((x) => x.id === dragId);
+    setDragId(null);
+    if (!b || !canDrag(b)) return;
+    onMove(b, iso, b.startTime!.slice(0, 5)); // même heure, autre jour
+  };
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
 
@@ -75,13 +94,38 @@ export function CalendarMonth({ monthDate, bookings, onSelect, onShowDay }: Prop
           return (
             <div
               key={iso}
+              onDoubleClick={() => onCreateAt?.(iso)}
+              onDragOver={(e) => {
+                if (!dragId) return;
+                e.preventDefault();
+                setDropIso(iso);
+              }}
+              onDragLeave={() => setDropIso((t) => (t === iso ? null : t))}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDrop(iso);
+              }}
+              title={onCreateAt ? "Double-clic : ajouter une réservation" : undefined}
               className={[
-                "flex min-h-[112px] flex-col gap-1 border-b border-r border-white/5 p-1.5 [&:nth-child(7n)]:border-r-0",
+                "group/cell flex min-h-[112px] cursor-default flex-col gap-1 border-b border-r border-white/5 p-1.5 [&:nth-child(7n)]:border-r-0",
                 outside ? "bg-black/20" : "",
                 isToday ? "bg-primary/10" : "",
+                dropIso === iso ? "bg-primary/20 ring-1 ring-inset ring-primary/60" : "",
               ].join(" ")}
             >
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between">
+                {onCreateAt ? (
+                  <button
+                    type="button"
+                    onClick={() => onCreateAt(iso)}
+                    title="Ajouter une réservation ce jour"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-sm font-bold text-primary opacity-0 transition-opacity hover:bg-primary/20 group-hover/cell:opacity-100"
+                  >
+                    +
+                  </button>
+                ) : (
+                  <span />
+                )}
                 <span
                   className={[
                     "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-bold",
@@ -98,15 +142,27 @@ export function CalendarMonth({ monthDate, bookings, onSelect, onShowDay }: Prop
 
               {shown.map((b) => {
                 const cfg = BOOKING_TYPES[b.type];
+                const draggable = canDrag(b);
                 return (
                   <button
                     key={`${iso}-${b.id}`}
                     type="button"
+                    draggable={draggable}
+                    onDragStart={(e) => {
+                      setDragId(b.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => {
+                      setDragId(null);
+                      setDropIso(null);
+                    }}
                     onClick={() => onSelect(b)}
-                    title={`${b.client} · ${cfg.label}${b.startTime ? ` · ${b.startTime}` : ""}`}
+                    title={`${b.client} · ${cfg.label}${b.startTime ? ` · ${b.startTime}` : ""}${draggable ? " · (glisser pour déplacer)" : ""}`}
                     className={[
                       "truncate rounded-md border-l-[3px] px-1.5 py-1 text-left text-[11px] font-semibold text-white transition-opacity hover:opacity-80",
+                      draggable ? "cursor-grab active:cursor-grabbing" : "",
                       b.status === "cancelled" ? "opacity-40 line-through" : "",
+                      dragId === b.id ? "opacity-40" : "",
                     ].join(" ")}
                     style={{ backgroundColor: typeBg(b.type), borderLeftColor: cfg.color }}
                   >

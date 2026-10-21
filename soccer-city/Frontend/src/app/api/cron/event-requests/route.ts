@@ -18,6 +18,7 @@ import {
   sendEventRequestReminderEmail,
   sendEventRequestExpiredEmail,
   sendAdminPendingRequestEmail,
+  sendReservationReminderEmail,
 } from "@/lib/email";
 
 const supabaseAdmin = createClient(
@@ -115,5 +116,65 @@ export async function GET(req: NextRequest) {
   }
 
   console.log(`✅ Cron demandes : ${reminders} rappel(s), ${expired} expiration(s)`);
-  return NextResponse.json({ ok: true, reminders, expired, checked: requests?.length ?? 0 });
+
+  // ============================================================
+  // RAPPELS DE RÉSERVATION — courriel au client LA VEILLE (Resend)
+  // ============================================================
+  // "Demain" est calculé dans le fuseau de Montréal (le cron tourne en UTC).
+  const montrealToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date()); // → YYYY-MM-DD
+  const tmr = new Date(`${montrealToday}T12:00:00`);
+  tmr.setDate(tmr.getDate() + 1);
+  const tomorrowIso = `${tmr.getFullYear()}-${String(tmr.getMonth() + 1).padStart(2, "0")}-${String(tmr.getDate()).padStart(2, "0")}`;
+
+  let bookingReminders = 0;
+  const { data: resas, error: resasErr } = await supabaseAdmin
+    .from("reservations")
+    .select("id, user_name, user_email, type, date, start_time, end_time, balance_due, balance_paid_at")
+    .eq("date", tomorrowIso)
+    .eq("status", "confirmed")
+    .is("reminder_sent_at", null)
+    .neq("user_email", "");
+
+  if (resasErr) {
+    console.error("❌ Cron rappels réservations — lecture:", resasErr);
+  } else {
+    // Un seul courriel par client et par jour (réservations multi-dates)
+    const byEmail = new Map<string, any[]>();
+    for (const r of resas ?? []) {
+      const key = String(r.user_email).toLowerCase();
+      byEmail.set(key, [...(byEmail.get(key) ?? []), r]);
+    }
+    for (const rows of Array.from(byEmail.values())) {
+      rows.sort((a: any, b: any) => String(a.start_time).localeCompare(String(b.start_time)));
+      const first = rows[0];
+      const stillDue = first.balance_paid_at ? 0 : Number(first.balance_due ?? 0);
+      await sendReservationReminderEmail({
+        userName: first.user_name || "cher client",
+        userEmail: first.user_email,
+        reservationType: first.type || "Terrain",
+        date: first.date,
+        startTime: String(first.start_time).slice(0, 5),
+        endTime: String(first.end_time).slice(0, 5),
+        balanceDue: stillDue,
+      });
+      const { error: markErr } = await supabaseAdmin
+        .from("reservations")
+        .update({ reminder_sent_at: new Date().toISOString() })
+        .in("id", rows.map((r: any) => r.id));
+      if (markErr) console.error("❌ Marquage rappel réservation:", markErr);
+      else bookingReminders++;
+    }
+  }
+
+  console.log(`✅ Cron rappels réservations : ${bookingReminders} courriel(s) pour le ${tomorrowIso}`);
+  return NextResponse.json({
+    ok: true,
+    reminders,
+    expired,
+    checked: requests?.length ?? 0,
+    bookingReminders,
+    tomorrow: tomorrowIso,
+  });
 }

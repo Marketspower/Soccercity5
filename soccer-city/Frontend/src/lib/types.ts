@@ -118,6 +118,10 @@ export interface Reservation {
   balanceReference: string | null;
   balanceAmount: number | null;
   status: ReservationStatus;
+  // ✅ Origine : 'site' (paiement en ligne) ou 'admin' (ajoutée à l'accueil)
+  source: "site" | "admin";
+  // ✅ Note interne (réservations ajoutées par l'admin)
+  notes: string | null;
   createdAt: string;
 }
 

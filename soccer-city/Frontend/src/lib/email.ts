@@ -255,3 +255,57 @@ export async function sendAdminPendingRequestEmail(params: EventRequestLifecycle
     console.error("❌ Erreur courriel alerte admin:", error);
   }
 }
+
+/* ============================================================
+ * RAPPEL DE RÉSERVATION — envoyé la veille par le cron quotidien
+ * ============================================================ */
+export interface ReservationReminderParams {
+  userName: string;
+  userEmail: string;
+  reservationType: string;
+  date: string;       // YYYY-MM-DD
+  startTime: string;  // HH:MM
+  endTime: string;    // HH:MM
+  balanceDue: number; // 0 si tout est payé
+}
+
+export async function sendReservationReminderEmail(params: ReservationReminderParams) {
+  const { userName, userEmail, reservationType, date, startTime, endTime, balanceDue } = params;
+  const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString("fr-CA", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      replyTo: REPLY_TO,
+      to: userEmail,
+      subject: `⏰ Rappel — votre réservation Soccer City demain (${startTime})`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #2f6bff;">⚽ À demain, ${userName} !</h1>
+          <p>Petit rappel de votre réservation chez <b>Soccer City</b> :</p>
+          <div style="background: #f5f7ff; border-radius: 8px; padding: 16px 20px; margin: 16px 0;">
+            <p style="margin: 4px 0;"><b>Type :</b> ${reservationType}</p>
+            <p style="margin: 4px 0;"><b>Date :</b> ${dateLabel}</p>
+            <p style="margin: 4px 0;"><b>Heure :</b> ${startTime} – ${endTime}</p>
+          </div>
+          ${
+            balanceDue > 0
+              ? `<p style="background: #fff7ed; border: 1px solid #fdba74; border-radius: 8px; padding: 12px 16px;">
+                   🟠 <b>Solde à régler sur place : ${balanceDue.toFixed(2)} $</b><br/>
+                   Payable à l'accueil (carte, comptant ou virement) avant l'accès au terrain.
+                 </p>`
+              : ""
+          }
+          <p>Pensez à arriver une dizaine de minutes à l'avance. Bonne séance !</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+          <p style="color: #666; font-size: 14px;">Soccer City — Plus qu'un jeu, une passion.</p>
+          <p style="color: #666; font-size: 14px;">835 Rue Saint-Jacques, Saint-Jean-sur-Richelieu, QC J3B 2N2</p>
+        </div>
+      `,
+    });
+    console.log("✅ Rappel de réservation envoyé à", userEmail);
+  } catch (error) {
+    console.error("❌ Erreur rappel de réservation:", error);
+  }
+}

@@ -35,6 +35,8 @@ export interface CalendarBooking {
   balanceReference: string | null;
   guests: number | null;
   message: string | null;
+  /** true = réservation ajoutée manuellement par l'admin (accueil). */
+  addedByAdmin: boolean;
   createdAt: string;
 }
 
@@ -88,7 +90,8 @@ export function buildCalendarBookings(
     balanceMethod: r.balanceMethod ?? null,
     balanceReference: r.balanceReference ?? null,
     guests: r.guests,
-    message: null,
+    message: r.notes ?? null,
+    addedByAdmin: r.source === "admin",
     createdAt: r.createdAt,
   }));
 
@@ -119,6 +122,7 @@ export function buildCalendarBookings(
     balanceReference: null,
     guests: e.guests,
     message: e.message || null,
+    addedByAdmin: false,
     createdAt: e.createdAt,
   }));
 

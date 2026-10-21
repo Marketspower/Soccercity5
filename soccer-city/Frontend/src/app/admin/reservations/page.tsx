@@ -15,15 +15,19 @@ import { BOOKING_TYPES, BOOKING_TYPE_KEYS, type BookingTypeKey } from "@/config/
 import {
   buildCalendarBookings,
   parseISODate,
+  toISODate,
   UNIFIED_TO_EVENT,
   type CalendarBooking,
 } from "@/lib/calendar-bookings";
 import { CalendarMonth } from "@/components/admin/calendar/calendar-month";
+import { CalendarWeek, weekStartOf } from "@/components/admin/calendar/calendar-week";
 import { BookingList } from "@/components/admin/calendar/booking-list";
 import { BookingDrawer } from "@/components/admin/calendar/booking-drawer";
+import { ManualBookingDialog } from "@/components/admin/calendar/manual-booking-dialog";
+import { timeToMinutes, minutesToTime } from "@/lib/time-utils";
 import type { ReservationStatus } from "@/lib/types";
 
-type ViewMode = "calendar" | "list";
+type ViewMode = "calendar" | "week" | "list";
 
 export default function AdminReservations() {
   const {
@@ -32,6 +36,7 @@ export default function AdminReservations() {
     setReservationStatus,
     setEventStatus,
     markReservationBalancePaid,
+    updateReservationSchedule,
     loadInitialData,
     isInitialized,
   } = useAppStore();
@@ -58,6 +63,12 @@ export default function AdminReservations() {
   // Les demandes d'événements (formulaire, sans paiement) restent dans la
   // page 🎉 Événements ; cette bascule permet de les superposer au besoin.
   const [includeEventRequests, setIncludeEventRequests] = useState(false);
+  // Création manuelle (double-clic sur un jour, ou bouton ➕)
+  const [createDate, setCreateDate] = useState<string | null>(null);
+  const [createTime, setCreateTime] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  // Vue semaine : lundi de la semaine affichée
+  const [weekStart, setWeekStart] = useState(() => weekStartOf(new Date()));
 
   /* ===== Données unifiées + filtrage ===== */
   const allBookings = useMemo(
@@ -90,6 +101,15 @@ export default function AdminReservations() {
     [filtered, monthKey]
   );
 
+  // Réservations couvrant la semaine affichée (vue semaine)
+  const weekBookings = useMemo(() => {
+    const startIso = toISODate(weekStart);
+    const end = new Date(weekStart);
+    end.setDate(weekStart.getDate() + 6);
+    const endIso = toISODate(end);
+    return filtered.filter((b) => b.date <= endIso && (b.endDate ?? b.date) >= startIso);
+  }, [filtered, weekStart]);
+
   const listBookings = useMemo(
     () =>
       [...filtered].sort((a, b) =>
@@ -111,6 +131,23 @@ export default function AdminReservations() {
   const selected = selectedId ? allBookings.find((b) => b.id === selectedId) ?? null : null;
 
   /* ===== Actions ===== */
+  // Glisser-déposer : déplace une réservation (durée conservée)
+  const handleMove = async (b: CalendarBooking, iso: string, startTime: string) => {
+    if (b.source !== "reservation" || !b.startTime || !b.endTime) return;
+    const duration =
+      timeToMinutes(b.endTime.slice(0, 5)) - timeToMinutes(b.startTime.slice(0, 5));
+    const start = timeToMinutes(startTime);
+    try {
+      await updateReservationSchedule(b.refId, {
+        date: iso,
+        startTime,
+        endTime: minutesToTime(start + duration),
+      });
+    } catch {
+      alert("Impossible de déplacer cette réservation.");
+    }
+  };
+
   const handleSetStatus = async (b: CalendarBooking, status: ReservationStatus) => {
     if (b.source === "reservation") {
       await setReservationStatus(b.refId, status);
@@ -137,31 +174,43 @@ export default function AdminReservations() {
 
   const goMonth = (delta: number) =>
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
+  const goWeek = (delta: number) =>
+    setWeekStart((d) => {
+      const n = new Date(d);
+      n.setDate(d.getDate() + delta * 7);
+      return n;
+    });
   const goToday = () => {
     const now = new Date();
     setMonthDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    setWeekStart(weekStartOf(now));
   };
+
+  const weekEnd = useMemo(() => {
+    const e = new Date(weekStart);
+    e.setDate(weekStart.getDate() + 6);
+    return e;
+  }, [weekStart]);
 
   /* ===== Raccourcis clavier : ← → mois, T aujourd'hui ===== */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest("input, select, textarea")) return;
-      if (view !== "calendar" || selectedId) return;
-      if (e.key === "ArrowLeft")
-        setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
-      if (e.key === "ArrowRight")
-        setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
-      if (e.key === "t" || e.key === "T") {
-        const now = new Date();
-        setMonthDate(new Date(now.getFullYear(), now.getMonth(), 1));
+      if (view === "list" || selectedId) return;
+      const delta = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
+      if (delta !== 0) {
+        if (view === "week") goWeek(delta);
+        else setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
       }
+      if (e.key === "t" || e.key === "T") goToday();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [view, selectedId]);
 
-  const shownCount = view === "calendar" ? monthBookings.length : listBookings.length;
+  const shownCount =
+    view === "calendar" ? monthBookings.length : view === "week" ? weekBookings.length : listBookings.length;
 
   return (
     <div className="space-y-5 p-6">
@@ -170,20 +219,44 @@ export default function AdminReservations() {
         <div>
           <h1 className="text-3xl font-bold text-white">Réservations</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {shownCount} réservation(s) {view === "calendar" ? "ce mois-ci" : "affichée(s)"}
+            {shownCount} réservation(s){" "}
+            {view === "calendar" ? "ce mois-ci" : view === "week" ? "cette semaine" : "affichée(s)"}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {view === "calendar" && (
+          <Button
+            variant="brand"
+            onClick={() => {
+              setCreateDate(null);
+              setCreateTime(null);
+              setCreateOpen(true);
+            }}
+            title="Ajouter une réservation (ou double-cliquez sur un jour du calendrier)"
+          >
+            ➕ Ajouter une réservation
+          </Button>
+          {view !== "list" && (
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" onClick={() => goMonth(-1)} title="Mois précédent (←)">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => (view === "week" ? goWeek(-1) : goMonth(-1))}
+                title={view === "week" ? "Semaine précédente (←)" : "Mois précédent (←)"}
+              >
                 <ChevronLeft className="size-4" />
               </Button>
-              <span className="min-w-[150px] text-center text-sm font-bold capitalize">
-                {monthDate.toLocaleDateString("fr-CA", { month: "long", year: "numeric" })}
+              <span className="min-w-[170px] text-center text-sm font-bold capitalize">
+                {view === "week"
+                  ? `${weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short" })} – ${weekEnd.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}`
+                  : monthDate.toLocaleDateString("fr-CA", { month: "long", year: "numeric" })}
               </span>
-              <Button variant="outline" size="icon" onClick={() => goMonth(1)} title="Mois suivant (→)">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => (view === "week" ? goWeek(1) : goMonth(1))}
+                title={view === "week" ? "Semaine suivante (→)" : "Mois suivant (→)"}
+              >
                 <ChevronRight className="size-4" />
               </Button>
               <Button variant="ghost" onClick={goToday} title="Raccourci : T">
@@ -204,7 +277,20 @@ export default function AdminReservations() {
                 view === "calendar" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
               ].join(" ")}
             >
-              <CalendarDays className="size-4" /> Calendrier
+              <CalendarDays className="size-4" /> Mois
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDayFilter(null);
+                setView("week");
+              }}
+              className={[
+                "flex items-center gap-1.5 px-4 py-2 text-sm font-semibold transition-colors",
+                view === "week" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              ].join(" ")}
+            >
+              <CalendarDays className="size-4" /> Semaine
             </button>
             <button
               type="button"
@@ -310,6 +396,24 @@ export default function AdminReservations() {
             setDayFilter(iso);
             setView("list");
           }}
+          onCreateAt={(iso) => {
+            setCreateDate(iso);
+            setCreateTime(null);
+            setCreateOpen(true);
+          }}
+          onMove={handleMove}
+        />
+      ) : view === "week" ? (
+        <CalendarWeek
+          weekStart={weekStart}
+          bookings={weekBookings}
+          onSelect={(b) => setSelectedId(b.id)}
+          onCreateAt={(iso, time) => {
+            setCreateDate(iso);
+            setCreateTime(time);
+            setCreateOpen(true);
+          }}
+          onMove={handleMove}
         />
       ) : (
         <BookingList
@@ -318,6 +422,15 @@ export default function AdminReservations() {
           onSetStatus={handleSetStatus}
         />
       )}
+
+      {/* ===== Création manuelle (façon Google Agenda) ===== */}
+      <ManualBookingDialog
+        open={createOpen}
+        initialDate={createDate}
+        initialTime={createTime}
+        bookings={allBookings}
+        onClose={() => setCreateOpen(false)}
+      />
 
       {/* ===== Fiche détail ===== */}
       <BookingDrawer
