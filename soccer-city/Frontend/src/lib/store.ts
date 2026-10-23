@@ -465,6 +465,26 @@ export const useAppStore = create<AppState>()(
           .subscribe();
 
         console.log('✅ Canaux Realtime configurés');
+
+        // ============================================
+        // FILET DE SÉCURITÉ — si le Realtime est coupé (onglet resté ouvert
+        // longtemps, connexion perdue, limite du plan), on resynchronise :
+        //   • au retour sur l'onglet (focus / visibilité)
+        //   • toutes les 60 secondes pour les données chaudes
+        // ============================================
+        if (typeof window !== 'undefined' && !(window as any).__sc5AutoRefresh) {
+          (window as any).__sc5AutoRefresh = true;
+          const refreshHot = () => {
+            get().syncReservations();
+            get().syncEvents();
+            get().syncBlocked();
+          };
+          window.addEventListener('focus', refreshHot);
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshHot();
+          });
+          setInterval(refreshHot, 60_000);
+        }
       },
 
       // ============================================
