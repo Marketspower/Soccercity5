@@ -148,32 +148,28 @@ BEGIN
 END $$;
 
 -- Médias par TYPE d'événement (et non plus par demande client)
-ALTER TABLE public.gallery ADD COLUMN IF NOT EXISTS event_type TEXT;
-ALTER TABLE public.media   ADD COLUMN IF NOT EXISTS event_type TEXT;
-
 DO $$
+DECLARE t TEXT;
 BEGIN
-  ALTER TABLE public.gallery DROP CONSTRAINT IF EXISTS gallery_event_type_check;
-  ALTER TABLE public.gallery ADD CONSTRAINT gallery_event_type_check
-    CHECK (event_type IS NULL OR event_type IN
-      ('Anniversaire', 'Tournoi', 'Entreprise', 'École', 'Événement privé', 'Compétition', 'Académie'));
-  ALTER TABLE public.media DROP CONSTRAINT IF EXISTS media_event_type_check;
-  ALTER TABLE public.media ADD CONSTRAINT media_event_type_check
-    CHECK (event_type IS NULL OR event_type IN
-      ('Anniversaire', 'Tournoi', 'Entreprise', 'École', 'Événement privé', 'Compétition', 'Académie'));
+  FOREACH t IN ARRAY ARRAY['gallery', 'media'] LOOP
+    IF to_regclass('public.' || t) IS NULL THEN
+      RAISE NOTICE 'Table % absente : ignorée', t;
+      CONTINUE;
+    END IF;
+    EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS event_type TEXT', t);
+    EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I', t, t || '_event_type_check');
+    EXECUTE format($f$ALTER TABLE public.%I ADD CONSTRAINT %I CHECK (event_type IS NULL OR event_type IN
+      ('Anniversaire', 'Tournoi', 'Entreprise', 'École', 'Événement privé', 'Compétition', 'Académie'))$f$,
+      t, t || '_event_type_check');
+    EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON public.%I(event_type)', 'idx_' || t || '_event_type', t);
+    -- Reprise des anciens liens (photo liée à une demande → type de la demande)
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = t AND column_name = 'event_id') THEN
+      EXECUTE format('UPDATE public.%I x SET event_type = pe.type FROM public.private_events pe
+                      WHERE x.event_id = pe.id AND x.event_type IS NULL', t);
+    END IF;
+  END LOOP;
 END $$;
-
--- Reprise des anciens liens (photo liée à une demande → type de la demande)
-UPDATE public.gallery g SET event_type = pe.type
-FROM public.private_events pe
-WHERE g.event_id = pe.id AND g.event_type IS NULL;
-
-UPDATE public.media m SET event_type = pe.type
-FROM public.private_events pe
-WHERE m.event_id = pe.id AND m.event_type IS NULL;
-
-CREATE INDEX IF NOT EXISTS idx_gallery_event_type ON public.gallery(event_type);
-CREATE INDEX IF NOT EXISTS idx_media_event_type ON public.media(event_type);
 
 -- ---------------------------------------------------------------------
 -- 2. ANTI-DOUBLE-RÉSERVATION EN BASE
@@ -294,38 +290,53 @@ LANGUAGE plpgsql
 SET search_path = public
 AS $$
 BEGIN
+  IF to_regclass('public.stats') IS NULL OR to_regclass('public.ratings') IS NULL THEN
+    RETURN NULL;
+  END IF;
   UPDATE public.stats
-  SET value = COALESCE((SELECT ROUND(AVG(rating) * 20) FROM public.ratings), value),
-      updated_at = NOW()
+  SET value = COALESCE((SELECT ROUND(AVG(rating) * 20) FROM public.ratings), value)
   WHERE key = 'satisfaction';
   RETURN NULL;
 END $$;
 
+-- Statistiques de la page d'accueil : chaque chiffre est calculé seulement
+-- si sa table existe (votre base ne contient pas forcément stats / ratings).
 DROP FUNCTION IF EXISTS public.get_homepage_stats();
 CREATE FUNCTION public.get_homepage_stats()
 RETURNS TABLE (fields_count INT, reservations_count INT, satisfaction_percent INT)
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT
-    (SELECT COUNT(*)::int FROM public.fields WHERE active),
-    (SELECT COUNT(*)::int FROM public.reservations WHERE status = 'confirmed'),
-    COALESCE(
-      (SELECT ROUND(AVG(rating) * 20)::int FROM public.ratings),
-      (SELECT value FROM public.stats WHERE key = 'satisfaction'),
-      0
-    );
-$$;
+DECLARE f INT := 0; r INT := 0; sat INT := NULL;
+BEGIN
+  IF to_regclass('public.fields') IS NOT NULL THEN
+    BEGIN
+      EXECUTE 'SELECT COUNT(*)::int FROM public.fields WHERE active' INTO f;
+    EXCEPTION WHEN undefined_column THEN
+      EXECUTE 'SELECT COUNT(*)::int FROM public.fields' INTO f;
+    END;
+  END IF;
+  EXECUTE 'SELECT COUNT(*)::int FROM public.reservations WHERE status = ''confirmed''' INTO r;
+  IF to_regclass('public.ratings') IS NOT NULL THEN
+    EXECUTE 'SELECT ROUND(AVG(rating) * 20)::int FROM public.ratings' INTO sat;
+  END IF;
+  IF sat IS NULL AND to_regclass('public.stats') IS NOT NULL THEN
+    EXECUTE 'SELECT value::int FROM public.stats WHERE key = ''satisfaction''' INTO sat;
+  END IF;
+  RETURN QUERY SELECT f, r, COALESCE(sat, 0);
+END $$;
 GRANT EXECUTE ON FUNCTION public.get_homepage_stats() TO anon, authenticated;
 
--- Notes : 1 à 5, commentaire limité
+-- Notes : commentaire limité (si la table existe)
 DO $$
 BEGIN
-  ALTER TABLE public.ratings DROP CONSTRAINT IF EXISTS ratings_comment_length;
-  ALTER TABLE public.ratings ADD CONSTRAINT ratings_comment_length
-    CHECK (comment IS NULL OR char_length(comment) <= 1000);
+  IF to_regclass('public.ratings') IS NOT NULL THEN
+    ALTER TABLE public.ratings DROP CONSTRAINT IF EXISTS ratings_comment_length;
+    ALTER TABLE public.ratings ADD CONSTRAINT ratings_comment_length
+      CHECK (comment IS NULL OR char_length(comment) <= 1000);
+  END IF;
 END $$;
 
 -- ---------------------------------------------------------------------
@@ -355,18 +366,17 @@ DO $$ BEGIN PERFORM pg_temp.drop_all_policies('private_events'); END $$;
 CREATE POLICY "private_events_admin" ON public.private_events
   FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
--- notifications : admin uniquement
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN PERFORM pg_temp.drop_all_policies('notifications'); END $$;
-CREATE POLICY "notifications_admin" ON public.notifications
-  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-
 -- ratings : lecture publique ; création via /api/rating (anti-spam)
-ALTER TABLE public.ratings ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN PERFORM pg_temp.drop_all_policies('ratings'); END $$;
-CREATE POLICY "ratings_lecture_publique" ON public.ratings FOR SELECT USING (true);
-CREATE POLICY "ratings_admin" ON public.ratings
-  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+DO $$
+BEGIN
+  IF to_regclass('public.ratings') IS NOT NULL THEN
+    ALTER TABLE public.ratings ENABLE ROW LEVEL SECURITY;
+    PERFORM pg_temp.drop_all_policies('ratings');
+    CREATE POLICY "ratings_lecture_publique" ON public.ratings FOR SELECT USING (true);
+    CREATE POLICY "ratings_admin" ON public.ratings
+      FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+  END IF;
+END $$;
 
 -- Tables « catalogue » : lecture publique, écriture admin
 DO $$
@@ -403,7 +413,7 @@ END $$;
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['payments', 'academy_enrollments']
+  FOREACH t IN ARRAY ARRAY['payments', 'academy_enrollments', 'notifications']
   LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN
       EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
@@ -441,13 +451,24 @@ CREATE POLICY "sc_storage_admin_delete" ON storage.objects
 -- ---------------------------------------------------------------------
 -- 8. Nettoyage des données factices
 -- ---------------------------------------------------------------------
-UPDATE public.settings
-SET value = '{"phone":"+1 (514) 965-9693","email":"soccercity5.mtl@gmail.com"}'::jsonb
-WHERE key = 'contact' AND value::text ILIKE '%555-0192%';
+DO $$
+BEGIN
+  IF to_regclass('public.settings') IS NOT NULL THEN
+    UPDATE public.settings
+    SET value = '{"phone":"+1 (514) 965-9693","email":"soccercity5.mtl@gmail.com"}'::jsonb
+    WHERE key = 'contact' AND value::text ILIKE '%555-0192%';
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Réglage contact non modifié : %', SQLERRM;
+END $$;
 
-UPDATE public.users SET phone = NULL WHERE phone = '+1 (450) 555-0192';
+DO $$
+BEGIN
+  UPDATE public.users SET phone = NULL WHERE phone = '+1 (450) 555-0192';
+EXCEPTION WHEN undefined_column THEN NULL;
+END $$;
 
 -- ---------------------------------------------------------------------
 -- VÉRIFICATION : liste des admins (doit contenir UNIQUEMENT vos comptes)
 -- ---------------------------------------------------------------------
-SELECT id, email, role, created_at FROM public.users WHERE role = 'admin' ORDER BY created_at;
+SELECT * FROM public.users WHERE role = 'admin';
