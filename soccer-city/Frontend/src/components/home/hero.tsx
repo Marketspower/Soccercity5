@@ -169,7 +169,7 @@ export function Hero() {
             </Button>
             <Button
               asChild
-              variant="glass"
+              variant="brand"
               size="lg"
               className="rounded-full px-8 text-white"
             >
