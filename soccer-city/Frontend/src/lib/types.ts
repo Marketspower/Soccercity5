@@ -20,6 +20,8 @@ export interface GalleryImage {
   alt: string;
   sortOrder: number;
   eventId: string | null;
+  /** Type d'événement auquel la photo est rattachée (null = galerie générale). */
+  eventType: MediaEventType | null;
   event?: {
     id: string;
     firstName: string;
@@ -42,6 +44,8 @@ export interface MediaItem {
   description: string | null;
   isFeatured: boolean;
   eventId: string | null;
+  /** Type d'événement auquel le média est rattaché (null = général). */
+  eventType: MediaEventType | null;
   event?: {
     id: string;
     firstName: string;
@@ -127,7 +131,13 @@ export interface Reservation {
 
 export type EventType = "Anniversaire" | "Tournoi" | "Entreprise" | "École" | "Événement privé" | "Compétition";
 
-export type EventStatus = "new" | "accepted" | "declined" | "expired";
+export type EventStatus = "new" | "accepted" | "declined" | "expired" | "paid";
+
+/** Types auxquels on peut rattacher des photos/vidéos (6 événements + Académie). */
+export type MediaEventType = EventType | "Académie";
+export const MEDIA_EVENT_TYPES: MediaEventType[] = [
+  "Anniversaire", "Tournoi", "Entreprise", "École", "Événement privé", "Compétition", "Académie",
+];
 
 export interface PrivateEvent {
   id: string;
@@ -142,6 +152,14 @@ export interface PrivateEvent {
   message: string;
   status: EventStatus;
   createdAt: string;
+  /** Proposition de l'admin (sous-total avant taxes) et horaire retenu */
+  quotedPrice?: number | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  adminMessage?: string | null;
+  acceptedAt?: string | null;
+  paidAt?: string | null;
+  hasPaymentLink?: boolean;
   media: MediaItem[];
   gallery: GalleryImage[];
 }
@@ -212,12 +230,14 @@ export interface CreateGalleryImage {
   imageUrl: string;
   alt: string;
   eventId?: string | null;
+  eventType?: MediaEventType | null;
 }
 
 export interface UpdateGalleryImage {
   alt?: string;
   sortOrder?: number;
   eventId?: string | null;
+  eventType?: MediaEventType | null;
 }
 
 export interface CreateMediaItem {
@@ -229,6 +249,7 @@ export interface CreateMediaItem {
   description?: string | null;
   isFeatured?: boolean;
   eventId?: string | null;
+  eventType?: MediaEventType | null;
 }
 
 export interface UpdateMediaItem {
@@ -240,4 +261,5 @@ export interface UpdateMediaItem {
   description?: string | null;
   isFeatured?: boolean;
   eventId?: string | null;
+  eventType?: MediaEventType | null;
 }

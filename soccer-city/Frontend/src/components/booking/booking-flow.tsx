@@ -246,6 +246,7 @@ export function BookingFlow() {
             <div className="mt-6">
               <TimeRangePicker
                 date={date}
+                fieldId={selectedField.id}
                 pricePerHour={selectedField.pricePerHour}
                 value={range}
                 onChange={setRange}
@@ -258,6 +259,7 @@ export function BookingFlow() {
               Le terrain vous sera réservé exclusivement, en continu, du début à la fin de la période.
             </p>
             <MultiDayPicker
+              fieldId={selectedField.id}
               pricePerHour={selectedField.pricePerHour}
               value={multiDay}
               onChange={setMultiDay}
@@ -270,6 +272,7 @@ export function BookingFlow() {
               avec le même horaire chaque jour (ex. tous les vendredis de 18 h à 20 h).
             </p>
             <MultiDatePicker
+              fieldId={selectedField.id}
               pricePerHour={selectedField.pricePerHour}
               value={multiDates}
               onChange={setMultiDates}

@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { 
   ArrowLeft, 
@@ -21,6 +20,7 @@ import { EventForm } from "@/components/events/event-form";
 import { EventBooking } from "@/components/events/event-booking";
 import { eventPackage } from "@/config/packages";
 import type { EventType, GalleryImage, MediaItem } from "@/lib/types";
+import { VideoPlayer } from "@/components/media/video-player";
 
 const EVENT_ICONS: Record<EventType, string> = {
   "Anniversaire": "🎂",
@@ -96,7 +96,7 @@ interface EventDetailProps {
 }
 
 export function EventDetail({ eventType }: EventDetailProps) {
-  const { gallery, media, loadGallery, loadMedia, isLoading } = useAppStore();
+  const { gallery, media, loadGallery, loadMedia } = useAppStore();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -108,14 +108,23 @@ export function EventDetail({ eventType }: EventDetailProps) {
     loadMedia();
   }, []);
 
-  // Filtrer les images et médias liés à l'événement (ou tous si aucun n'est associé)
-  const eventImages = gallery.filter(img => 
-    img.event?.type === eventType || !img.eventId
-  );
+  // Photos et vidéos rattachées à CE type d'événement (choisi dans l'admin).
+  // S'il n'y en a pas encore, on affiche la galerie générale en secours.
+  const typedImages = [
+    ...gallery.filter((img) => img.eventType === eventType),
+    ...media
+      .filter((m) => m.type === "photo" && m.eventType === eventType)
+      .map((m) => ({ id: m.id, imageUrl: m.url, alt: m.title } as GalleryImage)),
+  ];
+  const eventImages = typedImages.length > 0 ? typedImages : gallery.filter((img) => !img.eventType);
 
-  const eventVideos = media.filter(v => 
-    v.type === 'video' && (v.event?.type === eventType || !v.eventId)
-  );
+  const typedVideos = media.filter((v) => v.type === "video" && v.eventType === eventType);
+  const eventVideos: MediaItem[] = typedVideos;
+
+  // Revenir à la 1re image si la liste change (chargement, changement de type)
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [eventImages.length]);
 
   // Carrousel automatique
   useEffect(() => {
@@ -158,17 +167,6 @@ export function EventDetail({ eventType }: EventDetailProps) {
 
   const icon = EVENT_ICONS[eventType];
   const description = EVENT_DESCRIPTIONS[eventType];
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-pulse text-4xl mb-4">⚽</div>
-          <p className="text-muted-foreground">Chargement...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen pt-28 pb-24">
@@ -258,30 +256,20 @@ export function EventDetail({ eventType }: EventDetailProps) {
               </div>
             )}
 
-            {/* Vidéos */}
+            {/* Vidéos (YouTube, Vimeo ou fichier) */}
             {eventVideos.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-4">Vidéos associées</h3>
+                <h2 className="text-lg font-semibold mb-4">En vidéo</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {eventVideos.slice(0, 2).map((video) => (
-                    <div key={video.id} className="rounded-lg overflow-hidden bg-muted aspect-video">
-                      {video.thumbnail ? (
-                        <img
-                          src={video.thumbnail}
-                          alt={video.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center bg-primary/10">
-                          <Play className="size-12 text-primary" />
-                        </div>
-                      )}
-                    </div>
+                  {eventVideos.slice(0, 4).map((video) => (
+                    <figure key={video.id} className="space-y-2">
+                      <VideoPlayer url={video.url} title={video.title} poster={video.thumbnail} />
+                      <figcaption className="text-sm text-muted-foreground">{video.title}</figcaption>
+                    </figure>
                   ))}
                 </div>
               </div>
             )}
-
           </div>
 
           {/* Colonne droite - Formulaire */}

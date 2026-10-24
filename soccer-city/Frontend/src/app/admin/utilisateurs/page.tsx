@@ -8,7 +8,7 @@ import { useAppStore } from "@/lib/store";
 import { formatCAD } from "@/lib/utils";
 
 export default function AdminUsers() {
-  const { reservations } = useAppStore();
+  const { reservations, user } = useAppStore();
 
   const clients = useMemo(() => {
     const map = new Map<string, { 
@@ -58,7 +58,7 @@ export default function AdminUsers() {
             </span>
             <div>
               <p className="text-sm font-semibold">Administration Soccer City</p>
-              <p className="text-xs text-muted-foreground">admin@soccercity.ca</p>
+              <p className="text-xs text-muted-foreground">{user?.email ?? "Compte administrateur connecté"}</p>
             </div>
           </div>
           <Badge>Admin</Badge>

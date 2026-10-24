@@ -122,7 +122,7 @@ export function Gallery() {
                 className="max-h-[85vh] w-full rounded-lg object-contain"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = '/images/placeholder.jpg';
+                  target.src = '/images/hero-field.jpg';
                 }}
               />
               <p className="mt-3 text-center text-sm text-white/70">

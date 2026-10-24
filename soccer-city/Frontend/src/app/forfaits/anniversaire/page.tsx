@@ -3,6 +3,7 @@
 // (le bloc complet de 2 h 30 est vérifié contre les réservations existantes)
 // → coordonnées → paiement (totalité ou acompte).
 "use client";
+import { montrealNow } from "@/lib/time-utils";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -82,6 +83,9 @@ export default function AnniversairePage() {
   const freeStart = (h: number) => {
     const s = h;
     const e = h + dur;
+    // Aujourd'hui : pas d'heure déjà passée (heure de Montréal)
+    const now = montrealNow();
+    if (day === now.date && h * 60 <= now.minutes) return false;
     return !spans.some((sp) => {
       // Sur un même jour : chevauchement d'heures classique
       const a = sp.date < (day as string) ? 0 : timeToHour(sp.startTime);

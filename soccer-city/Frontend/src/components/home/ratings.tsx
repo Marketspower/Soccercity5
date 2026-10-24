@@ -11,6 +11,7 @@ export function Ratings() {
   const [selectedRating, setSelectedRating] = useState(0);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     loadRatings();
@@ -24,8 +25,9 @@ export function Ratings() {
       await addRating(selectedRating, comment);
       setSelectedRating(0);
       setComment("");
-    } catch (error) {
-      console.error('Erreur:', error);
+      setFeedback({ ok: true, text: "Merci pour votre note !" });
+    } catch (error: any) {
+      setFeedback({ ok: false, text: error?.message || "La note n'a pas pu être enregistrée." });
     } finally {
       setIsSubmitting(false);
     }
@@ -89,6 +91,9 @@ export function Ratings() {
           >
             {isSubmitting ? 'Envoi...' : 'Envoyer mon avis'}
           </Button>
+          {feedback && (
+            <p className={`mt-3 text-sm ${feedback.ok ? "text-green-500" : "text-destructive"}`}>{feedback.text}</p>
+          )}
         </div>
 
         {/* Liste des avis */}

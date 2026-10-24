@@ -22,10 +22,12 @@ export interface MultiDayValue {
 }
 
 export function MultiDayPicker({
+  fieldId,
   pricePerHour,
   value,
   onChange,
 }: {
+  fieldId?: string | null;
   pricePerHour: number;
   value: MultiDayValue;
   onChange: (v: MultiDayValue) => void;
@@ -34,8 +36,8 @@ export function MultiDayPicker({
 
   useEffect(() => {
     if (!value.startDate || !value.endDate) return;
-    fetchBookedSpans(value.startDate, value.endDate).then(setBookedSpans);
-  }, [value.startDate, value.endDate]);
+    fetchBookedSpans(value.startDate, value.endDate, fieldId).then(setBookedSpans);
+  }, [value.startDate, value.endDate, fieldId]);
 
   const timeOptions = useMemo(() => generateTimeOptions(OPENING, CLOSING, STEP_MINUTES), []);
 

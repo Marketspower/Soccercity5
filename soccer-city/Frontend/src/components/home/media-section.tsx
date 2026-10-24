@@ -1,39 +1,23 @@
 // components/home/media-section.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { Video, Music, ImageIcon } from "lucide-react";
+import { useEffect } from "react";
 import { Reveal } from "@/components/motion/reveal";
 import { useAppStore } from "@/lib/store";
+import { VideoPlayer } from "@/components/media/video-player";
 
 export function MediaSection() {
   const { media, syncMedia } = useAppStore();
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
-    const loadMedia = async () => {
-      await syncMedia();
-      setLoading(false);
-    };
-    loadMedia();
-  }, []);
+    syncMedia();
+  }, [syncMedia]);
 
-  // Filtrer les vidéos mises en avant
-  const featuredVideos = media.filter(m => m.type === 'video' && m.isFeatured);
-  const otherVideos = media.filter(m => m.type === 'video' && !m.isFeatured);
+  // Accueil : vidéos mises en avant + vidéos générales (celles rattachées à
+  // un type d'événement s'affichent sur la page de cet événement).
+  const featuredVideos = media.filter((m) => m.type === "video" && m.isFeatured);
+  const otherVideos = media.filter((m) => m.type === "video" && !m.isFeatured && !m.eventType);
 
-  if (loading) {
-    return (
-      <section className="container py-24 md:py-32">
-        <div className="text-center">
-          <div className="animate-pulse text-4xl mb-4">🎬</div>
-          <p className="text-muted-foreground">Chargement des médias...</p>
-        </div>
-      </section>
-    );
-  }
-
-  if (media.length === 0) {
+  if (featuredVideos.length + otherVideos.length === 0) {
     return null;
   }
 
@@ -54,18 +38,7 @@ export function MediaSection() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
           {featuredVideos.map((video) => (
             <div key={video.id} className="group relative rounded-lg overflow-hidden bg-muted">
-              <div className="aspect-video relative bg-black">
-                <video
-                  src={video.url}
-                  controls
-                  preload="metadata"
-                  playsInline
-                  poster={video.thumbnail || undefined}
-                  className="h-full w-full object-contain"
-                >
-                  Votre navigateur ne peut pas lire cette vidéo.
-                </video>
-              </div>
+              <VideoPlayer url={video.url} title={video.title} poster={video.thumbnail} />
               <div className="p-4 bg-card">
                 <h3 className="font-semibold">{video.title}</h3>
                 {video.description && (
@@ -88,18 +61,7 @@ export function MediaSection() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {otherVideos.map((video) => (
             <div key={video.id} className="group relative rounded-lg overflow-hidden bg-muted border border-white/10">
-              <div className="aspect-video relative bg-black">
-                <video
-                  src={video.url}
-                  controls
-                  preload="metadata"
-                  playsInline
-                  poster={video.thumbnail || undefined}
-                  className="h-full w-full object-contain"
-                >
-                  Votre navigateur ne peut pas lire cette vidéo.
-                </video>
-              </div>
+              <VideoPlayer url={video.url} title={video.title} poster={video.thumbnail} />
               <div className="p-3 bg-card/80">
                 <p className="text-sm font-medium truncate">{video.title}</p>
               </div>

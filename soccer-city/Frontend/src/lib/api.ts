@@ -4,48 +4,78 @@
 import { supabase } from "./supabase";
 import { useAppStore } from "./store";
 import { toISODate } from "./utils";
-import { computeTaxes, loadTaxSettings } from "./taxes";
 import type { EventType, GalleryImage, MediaItem } from "./types";
 
 // ============================================
-// CRÉNEAUX RÉSERVÉS/BLOQUÉS — pour vérifier les chevauchements (1 jour)
+// CRÉNEAUX OCCUPÉS — lecture via la vue busy_slots (aucune donnée client)
 // ============================================
 
-export async function fetchBookedRanges(
-  date: Date
-): Promise<{ startTime: string; endTime: string }[]> {
-  const iso = toISODate(date);
+interface BusyRow {
+  field_id?: string | null;
+  date: string;
+  end_date: string | null;
+  start_time: string;
+  end_time: string;
+}
 
-  // Vue busy_slots : expose uniquement les heures occupées, jamais les
-  // coordonnées des clients (confidentialité).
-  const { data: reservationsData, error: reservationsError } = await supabase
-    .from("busy_slots")
-    .select("start_time, end_time")
-    .eq("date", iso);
+/**
+ * Plages occupées (réservations + blocages) qui touchent [fromDate, toDate].
+ * @param fieldId  terrain concerné : seules ses réservations et celles qui
+ *                 privatisent le complexe (field_id vide) comptent.
+ *                 Sans fieldId : toutes les réservations (événements, anniversaires).
+ */
+async function fetchBusyRows(fromDate: string, toDate: string, fieldId?: string | null): Promise<BusyRow[]> {
+  const base = () =>
+    supabase
+      .from("busy_slots")
+      .select("*")
+      .lte("date", toDate)
+      .gte("end_date", fromDate);
 
-  if (reservationsError) {
-    console.error("❌ Erreur fetchBookedRanges (reservations):", reservationsError);
+  let reservations: BusyRow[] = [];
+  const filtered = fieldId ? base().or(`field_id.eq.${fieldId},field_id.is.null`) : base();
+  const { data, error } = await filtered;
+  if (error && fieldId) {
+    // Ancienne vue sans field_id (migration SQL non exécutée) : repli prudent.
+    const { data: all, error: err2 } = await base();
+    if (err2) console.error("❌ Erreur créneaux occupés:", err2);
+    reservations = (all || []) as BusyRow[];
+  } else {
+    if (error) console.error("❌ Erreur créneaux occupés:", error);
+    reservations = (data || []) as BusyRow[];
   }
 
+  const lower = new Date(`${fromDate}T12:00:00Z`);
+  lower.setUTCDate(lower.getUTCDate() - 62);
   const { data: blockedData, error: blockedError } = await supabase
     .from("availability")
-    .select("start_time, end_time")
-    .eq("date", iso);
+    .select("*")
+    .lte("date", toDate)
+    .gte("date", lower.toISOString().slice(0, 10));
+  if (blockedError) console.error("❌ Erreur blocages:", blockedError);
 
-  if (blockedError) {
-    console.error("❌ Erreur fetchBookedRanges (availability):", blockedError);
-  }
+  const blocked = ((blockedData || []) as any[])
+    .filter((b) => b.blocked !== false)
+    .filter((b) => !fieldId || !b.field_id || b.field_id === fieldId)
+    .map((b) => ({ date: b.date, end_date: b.end_date || b.date, start_time: b.start_time, end_time: b.end_time }))
+    .filter((b) => b.end_date >= fromDate);
 
-  const reservationRanges = (reservationsData || []).map((r: { start_time: string; end_time: string }) => ({
-    startTime: r.start_time,
-    endTime: r.end_time,
+  return [...reservations, ...blocked];
+}
+
+const hhmm = (t: string) => String(t).slice(0, 5);
+
+/** Plages occupées sur UNE journée (une réservation de plusieurs jours est découpée). */
+export async function fetchBookedRanges(
+  date: Date,
+  fieldId?: string | null
+): Promise<{ startTime: string; endTime: string }[]> {
+  const iso = toISODate(date);
+  const rows = await fetchBusyRows(iso, iso, fieldId);
+  return rows.map((r) => ({
+    startTime: r.date < iso ? "00:00" : hhmm(r.start_time),
+    endTime: (r.end_date || r.date) > iso ? "24:00" : hhmm(r.end_time),
   }));
-  const blockedRanges = (blockedData || []).map((b: { start_time: string; end_time: string }) => ({
-    startTime: b.start_time,
-    endTime: b.end_time,
-  }));
-
-  return [...reservationRanges, ...blockedRanges];
 }
 
 // ============================================
@@ -63,63 +93,26 @@ export interface Slot {
 const OPENING_HOUR = 8;   // 8 h
 const CLOSING_HOUR = 23;  // dernier créneau : 22 h – 23 h
 
-export async function fetchSlots(date: Date): Promise<Slot[]> {
-  const iso = toISODate(date);
-
-  const { data: reservationsData, error: reservationsError } = await supabase
-    .from("busy_slots")
-    .select("start_time, end_time")
-    .eq("date", iso);
-
-  if (reservationsError) {
-    console.error("❌ Erreur fetchSlots (reservations):", reservationsError);
-  }
-
-  const { data: blockedData, error: blockedError } = await supabase
-    .from("availability")
-    .select("start_time, end_time")
-    .eq("date", iso);
-
-  if (blockedError) {
-    console.error("❌ Erreur fetchSlots (availability):", blockedError);
-  }
-
+export async function fetchSlots(date: Date, fieldId?: string | null): Promise<Slot[]> {
+  const ranges = await fetchBookedRanges(date, fieldId);
   const toMinutes = (t: string) => {
     const [h, m] = t.split(":").map(Number);
     return h * 60 + (m || 0);
   };
-
-  const taken = (reservationsData || []).map((r: { start_time: string; end_time: string }) => ({
-    start: toMinutes(r.start_time),
-    end: toMinutes(r.end_time),
-  }));
-  const blocked = (blockedData || []).map((b: { start_time: string; end_time: string }) => ({
-    start: toMinutes(b.start_time),
-    end: toMinutes(b.end_time),
-  }));
+  const taken = ranges.map((r) => ({ start: toMinutes(r.startTime), end: toMinutes(r.endTime) }));
 
   const slots: Slot[] = [];
   for (let hour = OPENING_HOUR; hour < CLOSING_HOUR; hour++) {
     const start = hour * 60;
     const end = start + 60;
-    const overlaps = (r: { start: number; end: number }) => r.start < end && r.end > start;
-
-    let state: SlotState = "free";
-    if (blocked.some(overlaps)) state = "blocked";
-    else if (taken.some(overlaps)) state = "taken";
-
-    slots.push({
-      hour,
-      label: `${hour} h – ${hour + 1} h`,
-      state,
-    });
+    const busy = taken.some((r) => r.start < end && r.end > start);
+    slots.push({ hour, label: `${hour} h – ${hour + 1} h`, state: busy ? "taken" : "free" });
   }
-
   return slots;
 }
 
 // ============================================
-// Plages réservées/bloquées sur plusieurs jours (réservations continues)
+// Plages réservées/bloquées sur plusieurs jours
 // ============================================
 
 export interface BookedSpan {
@@ -129,98 +122,22 @@ export interface BookedSpan {
   endTime: string;
 }
 
-export async function fetchBookedSpans(fromDate: string, toDate: string): Promise<BookedSpan[]> {
-  const { data: reservationsData, error: reservationsError } = await supabase
-    .from("busy_slots")
-    .select("date, start_time, end_date, end_time")
-    .lte("date", toDate);
-
-  if (reservationsError) {
-    console.error("❌ Erreur fetchBookedSpans (reservations):", reservationsError);
-  }
-
-  const { data: blockedData, error: blockedError } = await supabase
-    .from("availability")
-    .select("date, start_time, end_date, end_time")
-    .lte("date", toDate);
-
-  if (blockedError) {
-    console.error("❌ Erreur fetchBookedSpans (availability):", blockedError);
-  }
-
-  const normalize = (rows: any[] | null): BookedSpan[] =>
-    (rows || []).map((r) => ({
-      date: r.date,
-      startTime: r.start_time,
-      endDate: r.end_date || r.date,
-      endTime: r.end_time,
-    }));
-
-  return [...normalize(reservationsData), ...normalize(blockedData)].filter(
-    (s) => s.endDate >= fromDate
-  );
+export async function fetchBookedSpans(
+  fromDate: string,
+  toDate: string,
+  fieldId?: string | null
+): Promise<BookedSpan[]> {
+  const rows = await fetchBusyRows(fromDate, toDate, fieldId);
+  return rows.map((r) => ({
+    date: r.date,
+    startTime: hhmm(r.start_time),
+    endDate: r.end_date || r.date,
+    endTime: hhmm(r.end_time),
+  }));
 }
 
-// ============================================
-// RÉSERVATIONS
-// ============================================
-
-export async function createReservation(input: {
-  date: string;
-  startTime: string;
-  endTime: string;
-  endDate?: string | null;
-  price: number;
-  userName: string;
-  userEmail: string;
-  userPhone: string;
-}) {
-  const { data: existing } = await supabase
-    .from('reservations')
-    .select('id')
-    .eq('date', input.date)
-    .neq('status', 'cancelled')
-    .lt('start_time', input.endTime)
-    .gt('end_time', input.startTime);
-
-  if (existing && existing.length > 0) {
-    throw new Error('Ce créneau chevauche une réservation existante');
-  }
-
-  // ✅ Taxes TPS/TVQ calculées avec les taux configurés dans l'admin
-  const taxes = computeTaxes(input.price, await loadTaxSettings());
-
-  const reservation = await useAppStore.getState().addReservation({
-    userName: input.userName,
-    userEmail: input.userEmail,
-    userPhone: input.userPhone,
-    date: input.date,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    endDate: input.endDate || null,
-    price: taxes.subtotal,
-    taxGst: taxes.gst,
-    taxQst: taxes.qst,
-    total: taxes.total,
-    type: "Terrain",
-    guests: null,
-    paymentOption: "full",
-    amountPaid: taxes.total,
-    balanceDue: 0,
-    balancePaidAt: null,
-    balanceMethod: null,
-    balanceReference: null,
-    balanceAmount: null,
-  });
-
-  await supabase.channel('reservations-changes').send({
-    type: 'broadcast',
-    event: 'new_reservation',
-    payload: reservation
-  });
-
-  return reservation;
-}
+// Les clients réservent UNIQUEMENT via le paiement Stripe (/api/checkout) :
+// plus aucune création de réservation directe depuis le navigateur.
 
 // ============================================
 // ÉVÉNEMENTS PRIVÉS
@@ -238,6 +155,8 @@ export async function createPrivateEvent(input: {
   guests: number;
   type: EventType;
   message: string;
+  /** Champ piège anti-robot (doit rester vide). */
+  website?: string;
 }) {
   const res = await fetch("/api/event-request", {
     method: "POST",

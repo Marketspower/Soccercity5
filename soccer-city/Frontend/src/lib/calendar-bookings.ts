@@ -45,6 +45,7 @@ const EVENT_TO_UNIFIED: Record<PrivateEvent["status"], ReservationStatus> = {
   accepted: "confirmed",
   declined: "cancelled",
   expired: "cancelled",
+  paid: "confirmed",
 };
 
 export const UNIFIED_TO_EVENT: Record<ReservationStatus, PrivateEvent["status"]> = {
@@ -95,7 +96,9 @@ export function buildCalendarBookings(
     createdAt: r.createdAt,
   }));
 
-  const fromEvents: CalendarBooking[] = events.map((e) => ({
+  // Une demande payée a déjà sa vraie réservation dans le calendrier :
+  // on ne l'affiche pas une seconde fois.
+  const fromEvents: CalendarBooking[] = events.filter((e) => e.status !== "paid").map((e) => ({
     id: `evt-${e.id}`,
     source: "event",
     refId: e.id,

@@ -13,8 +13,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchBookedSpans, type BookedSpan } from "@/lib/api";
 import {
-  generateTimeOptions, timeToMinutes, computeDurationHours, formatDuration,
-} from "@/lib/time-utils";
+  generateTimeOptions, timeToMinutes, computeDurationHours, formatDuration, futureStartTimes } from "@/lib/time-utils";
 
 const OPENING = "08:00";
 const CLOSING = "23:00";
@@ -39,11 +38,13 @@ function spanOnDay(span: BookedSpan, day: string): { start: string; end: string 
 }
 
 export function MultiDatePicker({
+  fieldId,
   pricePerHour,
   value,
   onChange,
   onConflictsChange,
 }: {
+  fieldId?: string | null;
   pricePerHour: number;
   value: MultiDatesValue;
   onChange: (v: MultiDatesValue) => void;
@@ -59,8 +60,9 @@ export function MultiDatePicker({
   // Plages occupées entre la première et la dernière date sélectionnée
   useEffect(() => {
     if (sorted.length === 0) return;
-    fetchBookedSpans(sorted[0], sorted[sorted.length - 1]).then(setBookedSpans);
-  }, [sorted.join(",")]);
+    fetchBookedSpans(sorted[0], sorted[sorted.length - 1], fieldId).then(setBookedSpans);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sorted.join(","), fieldId]);
 
   const timeOptions = useMemo(
     () => generateTimeOptions(OPENING, CLOSING, STEP_MINUTES),
@@ -230,7 +232,7 @@ export function MultiDatePicker({
             className="w-full rounded-md border bg-card px-3 py-2 outline-none focus:border-primary"
           >
             <option value="">-- Choisir --</option>
-            {timeOptions.map((t) => (
+            {futureStartTimes(timeOptions.slice(0, -1), value.dates).map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>

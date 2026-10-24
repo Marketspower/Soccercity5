@@ -315,7 +315,7 @@ export default function AdminFields() {
                       Cliquez ou glissez une image
                     </p>
                     <p className="text-xs text-muted-foreground/50">
-                      JPG, PNG, WEBP ou SVG (max 5MB)
+                      JPG, PNG ou WEBP (max 5 Mo)
                     </p>
                     <Button 
                       variant="outline" 
@@ -333,7 +333,7 @@ export default function AdminFields() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                  accept="image/jpeg,image/png,image/webp"
                   onChange={handleFileChange}
                   className="absolute inset-0 opacity-0 cursor-pointer"
                   disabled={uploading}

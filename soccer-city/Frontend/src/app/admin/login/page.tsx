@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +23,6 @@ export default function AdminLogin() {
     setSuccess(false);
 
     try {
-      console.log("🔐 Tentative de connexion avec:", email);
-
       // 1. Connexion avec Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -31,70 +30,31 @@ export default function AdminLogin() {
       });
 
       if (error) {
-        console.error("❌ Erreur connexion:", error);
-        setError(error.message || "Erreur de connexion");
+        setError("Courriel ou mot de passe incorrect.");
         setLoading(false);
         return;
       }
 
-      console.log("✅ Utilisateur connecté:", data.user?.id);
-
-      // 2. Vérifier le rôle admin dans la table users
+      // 2. Vérifier le rôle admin dans la table users.
+      // ⛔ Aucun compte n'est JAMAIS créé ni promu admin depuis cette page :
+      // les administrateurs sont désignés uniquement dans Supabase
+      // (table users, colonne role = 'admin').
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('role')
         .eq('id', data.user.id)
         .maybeSingle();
 
-      if (userError) {
-        console.error("❌ Erreur vérification rôle:", userError);
-        setError("Erreur lors de la vérification des droits");
+      if (userError || !userData || userData.role !== 'admin') {
+        await supabase.auth.signOut();
+        setError("Accès non autorisé. Ce compte n'est pas administrateur.");
         setLoading(false);
         return;
       }
 
-      console.log("📊 Rôle utilisateur:", userData);
-
-      // 3. Si l'utilisateur n'existe pas dans la table users
-      if (!userData) {
-        console.log("⚠️ Utilisateur non trouvé dans users, création...");
-        
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            email: data.user.email,
-            first_name: 'Admin',
-            last_name: 'Soccer City',
-            role: 'admin',
-            phone: '+1 (450) 555-0192'
-          });
-
-        if (insertError) {
-          console.error("❌ Erreur insertion:", insertError);
-          setError("Erreur lors de la création de l'utilisateur");
-          setLoading(false);
-          return;
-        }
-
-        console.log("✅ Admin créé avec succès");
-        setSuccess(true);
-        setTimeout(() => router.push('/admin'), 1000);
-        setLoading(false);
-        return;
-      }
-
-      // 4. Vérifier le rôle
-      if (userData.role !== 'admin') {
-        console.log("❌ Rôle non admin:", userData.role);
-        setError("Accès non autorisé. Vous devez être administrateur.");
-        setLoading(false);
-        return;
-      }
-
-      console.log("✅ Connexion admin réussie !");
       setSuccess(true);
-      setTimeout(() => router.push('/admin'), 1000);
+      await useAppStore.getState().loadUser();
+      setTimeout(() => router.push('/admin'), 600);
       
     } catch (error: any) {
       console.error("❌ Erreur:", error);

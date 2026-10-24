@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchBookedSpans, type BookedSpan } from "@/lib/api";
-import { generateTimeOptions, timeToMinutes } from "@/lib/time-utils";
+import { generateTimeOptions, timeToMinutes, futureStartTimes } from "@/lib/time-utils";
 import {
   computeTaxes, computeDeposit, loadTaxSettings, loadPaymentSettings,
   DEFAULT_TAX_SETTINGS, DEFAULT_PAYMENT_SETTINGS,
@@ -235,7 +235,7 @@ export function EventBooking({
               onChange={(e) => { setStartTime(e.target.value); setEndTime(""); }}
               className="w-full rounded-md border bg-card px-3 py-2 outline-none focus:border-primary">
               <option value="">-- Choisir --</option>
-              {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+              {futureStartTimes(timeOptions.slice(0, -1), dates).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>

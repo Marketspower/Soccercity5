@@ -1,39 +1,52 @@
 // app/admin/evenements/[type]/page.tsx
+// Photos et vidéos affichées sur la page publique d'un type d'événement.
 "use client";
 
 import { useParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, ExternalLink } from "lucide-react";
+import { AdminGallery } from "@/components/admin/AdminGallery";
+import { AdminMedia } from "@/components/admin/AdminMedia";
+import { MEDIA_EVENT_TYPES, type MediaEventType } from "@/lib/types";
 
-export default function AdminEventDetailPage() {
+export default function AdminEventTypeMediaPage() {
   const params = useParams();
-  const type = params?.type as string;
-  const decodedType = decodeURIComponent(type);
+  const decodedType = decodeURIComponent(String(params?.type ?? "")) as MediaEventType;
+  const valid = MEDIA_EVENT_TYPES.includes(decodedType);
+  const publicHref =
+    decodedType === "Anniversaire"
+      ? "/forfaits/anniversaire"
+      : decodedType === "Académie"
+      ? "/forfaits/academie"
+      : `/evenements/${encodeURIComponent(decodedType)}`;
 
   return (
-    <div className="container py-8">
-      <Link href="/admin/evenements" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6">
-        <ArrowLeft className="size-4" />
-        Retour aux événements
-      </Link>
-
-      <div className="bg-white/5 border border-white/10 rounded-xl p-8">
-        <h1 className="text-2xl font-bold text-white">Administration - Événement</h1>
-        <p className="text-muted-foreground mt-2">Type: <span className="text-white font-semibold">{decodedType}</span></p>
-        
-        <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-          <p className="text-yellow-500">📝 Page d'administration en construction</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Cette page permettra de gérer les détails de l'événement.
-          </p>
-        </div>
-
-        <div className="mt-6 flex gap-4">
-          <Button variant="brand">Modifier</Button>
-          <Button variant="destructive">Supprimer</Button>
-        </div>
+    <div className="space-y-10 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/admin/evenements"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+        >
+          <ArrowLeft className="size-4" />
+          Retour aux demandes d&apos;événement
+        </Link>
+        {valid && (
+          <Link href={publicHref} target="_blank" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+            Voir la page publique <ExternalLink className="size-3.5" />
+          </Link>
+        )}
       </div>
+
+      {!valid ? (
+        <p className="rounded-lg border border-dashed p-12 text-center text-sm text-muted-foreground">
+          Type d&apos;événement inconnu.
+        </p>
+      ) : (
+        <>
+          <AdminGallery fixedEventType={decodedType} />
+          <AdminMedia fixedEventType={decodedType} />
+        </>
+      )}
     </div>
   );
 }

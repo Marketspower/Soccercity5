@@ -50,14 +50,18 @@ export function Hero() {
     // si aucune vidéo, la photo du terrain reste le fond du hero).
     const fetchVideo = async () => {
       try {
-        const { data, error } = await supabase
+        // Fond du hero : uniquement un FICHIER vidéo (pas un lien YouTube/Vimeo).
+        const { data: rows, error } = await supabase
           .from('media')
           .select('url, thumbnail')
           .eq('type', 'video')
           .eq('is_featured', true)
-          .maybeSingle();
+          .like('url', '%/storage/v1/object/public/%')
+          .order('created_at', { ascending: false })
+          .limit(1);
 
         if (error) throw error;
+        const data = rows?.[0];
 
         if (data) {
           setVideoUrl(data.url);

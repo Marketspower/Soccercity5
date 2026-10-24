@@ -10,6 +10,7 @@ import {
   timeToMinutes,
   computeDurationHours,
   formatDuration,
+  futureStartTimes,
 } from "@/lib/time-utils";
 
 const OPENING = "08:00";
@@ -24,11 +25,14 @@ export interface TimeRangeValue {
 
 export function TimeRangePicker({
   date,
+  fieldId,
   pricePerHour,
   value,
   onChange,
 }: {
   date: Date;
+  /** Terrain choisi : seules ses réservations (et les privatisations) bloquent. */
+  fieldId?: string | null;
   pricePerHour: number;
   value: TimeRangeValue;
   onChange: (v: TimeRangeValue) => void;
@@ -36,13 +40,14 @@ export function TimeRangePicker({
   const iso = toISODate(date);
 
   const { data: bookedRanges, isLoading } = useQuery({
-    queryKey: ["booked-ranges", iso],
-    queryFn: () => fetchBookedRanges(date),
+    queryKey: ["booked-ranges", iso, fieldId ?? "all"],
+    queryFn: () => fetchBookedRanges(date, fieldId),
   });
 
+  // Heures de début : avant la fermeture, et pas déjà passées si c'est aujourd'hui
   const startOptions = useMemo(
-    () => generateTimeOptions(OPENING, CLOSING, STEP_MINUTES),
-    []
+    () => futureStartTimes(generateTimeOptions(OPENING, CLOSING, STEP_MINUTES).slice(0, -1), [iso]),
+    [iso]
   );
 
   const endOptions = useMemo(() => {

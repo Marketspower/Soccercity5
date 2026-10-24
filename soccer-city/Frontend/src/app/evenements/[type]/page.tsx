@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: EventPageProps) {
   };
 
   return {
-    title: `${titles[validType]} | Soccer City`,
+    title: titles[validType],
     description: `Réservez votre ${validType.toLowerCase()} chez Soccer City. Terrains premium, encadrement professionnel et équipements de qualité.`,
   };
 }

@@ -77,7 +77,9 @@ interface Props {
 }
 
 export function ManualBookingDialog({ open, initialDate, initialTime, bookings, onClose }: Props) {
-  const { addManualReservations } = useAppStore();
+  const { addManualReservations, fields } = useAppStore();
+  /** Terrain concerné ; vide = tout le complexe (privatisation). */
+  const [fieldId, setFieldId] = useState<string>("");
 
   const [dates, setDates] = useState<string[]>([]);
   const [month, setMonth] = useState(() => new Date());
@@ -131,6 +133,7 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
     setType("Terrain");
     setNotes("");
     setForce(false);
+    setFieldId("");
     setError("");
   }, [open, initialDate, initialTime]);
 
@@ -220,6 +223,8 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
         email,
         type,
         notes,
+        fieldId: fieldId || null,
+        force,
         payment: breakdown
           ? {
               ...breakdown,
@@ -231,7 +236,11 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
       });
       onClose();
     } catch (err: any) {
-      setError(err?.message || "Impossible d'enregistrer la réservation.");
+      setError(
+        err?.code === "23P01"
+          ? "Ce créneau est déjà occupé sur ce terrain (ou le complexe est privatisé). Choisissez un autre terrain/horaire, ou cochez « forcer »."
+          : err?.message || "Impossible d'enregistrer la réservation."
+      );
       setSaving(false);
     }
   };
@@ -413,6 +422,20 @@ export function ManualBookingDialog({ open, initialDate, initialTime, bookings, 
               <Label>Courriel (optionnel)</Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="client@exemple.com" />
             </div>
+          </div>
+
+          {/* ===== Terrain ===== */}
+          <div className="space-y-1.5">
+            <Label>Terrain *</Label>
+            <Select value={fieldId} onChange={(e) => setFieldId(e.target.value)}>
+              <option value="">Tout le complexe (privatisation)</option>
+              {fields.filter((f) => f.active !== false).map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              « Tout le complexe » bloque les deux terrains sur cet horaire.
+            </p>
           </div>
 
           {/* ===== Type d'événement ===== */}

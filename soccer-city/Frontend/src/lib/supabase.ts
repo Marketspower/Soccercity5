@@ -30,14 +30,8 @@ export const getSupabaseHeaders = () => {
   };
 };
 
-// Logger l'état (uniquement côté client)
-if (typeof window !== 'undefined') {
-  console.log('🔧 Supabase configuré:', isSupabaseConfigured());
-  if (isSupabaseConfigured()) {
-    console.log('✅ Connexion à Supabase:', supabaseUrl);
-  } else {
-    console.warn('⚠️ Supabase non configuré - Mode dégradé');
-  }
+if (typeof window !== 'undefined' && !isSupabaseConfigured()) {
+  console.warn('⚠️ Supabase non configuré - Mode dégradé');
 }
 
 // ✅ Pas de `global.headers` codés en dur ici : le SDK gère automatiquement
@@ -67,7 +61,6 @@ export const checkSupabaseConnection = async () => {
   try {
     const { data, error } = await supabase.from('fields').select('count', { count: 'exact', head: true });
     if (error) throw error;
-    console.log('✅ Connexion Supabase établie');
     return true;
   } catch (error) {
     console.error('❌ Erreur de connexion Supabase:', error);

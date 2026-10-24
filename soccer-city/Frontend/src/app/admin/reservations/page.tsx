@@ -16,7 +16,6 @@ import {
   buildCalendarBookings,
   parseISODate,
   toISODate,
-  UNIFIED_TO_EVENT,
   type CalendarBooking,
 } from "@/lib/calendar-bookings";
 import { CalendarMonth } from "@/components/admin/calendar/calendar-month";
@@ -34,7 +33,7 @@ export default function AdminReservations() {
     reservations,
     events,
     setReservationStatus,
-    setEventStatus,
+    respondToEvent,
     markReservationBalancePaid,
     recordReceptionPayment,
     updateReservationSchedule,
@@ -152,8 +151,12 @@ export default function AdminReservations() {
   const handleSetStatus = async (b: CalendarBooking, status: ReservationStatus) => {
     if (b.source === "reservation") {
       await setReservationStatus(b.refId, status);
+    } else if (status === "cancelled") {
+      // Refus d'une demande : le client est prévenu par courriel + SMS.
+      await respondToEvent(b.refId, { action: "decline" });
     } else {
-      await setEventStatus(b.refId, UNIFIED_TO_EVENT[status]);
+      // Accepter une demande exige un prix et un horaire → page Événements.
+      window.location.href = "/admin/evenements";
     }
   };
 

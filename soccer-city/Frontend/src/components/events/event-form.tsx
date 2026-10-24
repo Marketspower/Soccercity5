@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DateCalendar } from "@/components/ui/date-calendar";
 import { createPrivateEvent } from "@/lib/api";
+import { trackConversion } from "@/components/layout/analytics";
 import type { EventType } from "@/lib/types";
 
 const EVENT_TYPES: EventType[] = [
@@ -67,9 +68,18 @@ export function EventForm({ selectedType }: EventFormProps) {
     }
   }, [selectedType, setValue]);
 
+  const [submitError, setSubmitError] = useState("");
+  const [website, setWebsite] = useState(""); // champ piège anti-robot
+
   const onSubmit = async (data: FormValues) => {
-    await createPrivateEvent(data);
-    setSent(true);
+    setSubmitError("");
+    try {
+      await createPrivateEvent({ ...data, website });
+      trackConversion("Lead");
+      setSent(true);
+    } catch (err: any) {
+      setSubmitError(err?.message || "La demande n'a pas pu être envoyée. Réessayez ou appelez-nous.");
+    }
   };
 
   if (sent) {
@@ -80,7 +90,7 @@ export function EventForm({ selectedType }: EventFormProps) {
         </span>
         <h2 className="display text-3xl">Demande envoyée</h2>
         <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-          Notre équipe vous rappelle sous 24 h.
+          Vous recevrez notre réponse par courriel, avec une proposition et un lien de paiement sécurisé.
         </p>
       </div>
     );
@@ -92,6 +102,13 @@ export function EventForm({ selectedType }: EventFormProps) {
       noValidate
       className="glass rounded-lg p-7 md:p-9"
     >
+      {/* Champ piège : invisible pour les humains, rempli par les robots */}
+      <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
+        <label>
+          Site web
+          <input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+        </label>
+      </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="e-lastname">Nom</Label>
@@ -215,6 +232,10 @@ export function EventForm({ selectedType }: EventFormProps) {
           )}
         </div>
       </div>
+
+      {submitError && (
+        <p className="mt-5 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">{submitError}</p>
+      )}
 
       <Button
         type="submit"

@@ -22,8 +22,6 @@ import type {
   Page
 } from "./types";
 
-// API Backend URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // Fonction utilitaire pour nettoyer les données des terrains
 const sanitizeFieldData = (data: any) => {
@@ -59,6 +57,14 @@ const mapFieldFromDb = (row: any): Field => ({
   active: row.active,
   created_at: row.created_at,
 });
+
+/** Chemin d'un fichier dans un bucket à partir de son URL publique Supabase. */
+const storagePathFromUrl = (url: string | null | undefined, bucket: string): string | null => {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  const i = url.indexOf(marker);
+  return i === -1 ? null : decodeURIComponent(url.slice(i + marker.length).split('?')[0]);
+};
 
 // ✅ Mapping snake_case (Supabase) → camelCase pour les réservations
 const mapReservationFromDb = (row: any): Reservation => ({
@@ -129,6 +135,7 @@ const mapGalleryFromDb = (row: any): GalleryImage => ({
   alt: row.alt,
   sortOrder: row.sort_order ?? 0,
   eventId: row.event_id ?? null,
+  eventType: row.event_type ?? null,
   event: mapJoinedEvent(row.event),
   createdAt: row.created_at,
 });
@@ -144,9 +151,35 @@ const mapMediaFromDb = (row: any): MediaItem => ({
   description: row.description ?? null,
   isFeatured: row.is_featured ?? false,
   eventId: row.event_id ?? null,
+  eventType: row.event_type ?? null,
   event: mapJoinedEvent(row.event),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+});
+
+// ✅ Mapping des demandes d'événement (admin) — snake_case → camelCase
+const mapEventFromDb = (row: any): PrivateEvent => ({
+  id: row.id,
+  firstName: row.first_name,
+  lastName: row.last_name,
+  company: row.company ?? undefined,
+  phone: row.phone,
+  email: row.email,
+  date: row.date,
+  guests: row.guests,
+  type: row.type,
+  message: row.message,
+  status: row.status,
+  createdAt: row.created_at,
+  quotedPrice: row.quoted_price ?? null,
+  startTime: row.start_time ?? null,
+  endTime: row.end_time ?? null,
+  adminMessage: row.admin_message ?? null,
+  acceptedAt: row.accepted_at ?? null,
+  paidAt: row.paid_at ?? null,
+  hasPaymentLink: !!row.payment_token,
+  media: (row.media || []).map((m: any) => mapMediaFromDb(m)),
+  gallery: (row.gallery || []).map((g: any) => mapGalleryFromDb(g)),
 });
 
 // ✅ Mapping snake_case (Supabase) → camelCase pour les médias de terrain
@@ -191,6 +224,8 @@ interface AppState {
 
   // Chargement
   loadInitialData: () => Promise<void>;
+  /** Données privées (réservations, demandes, notifications) : admin seulement. */
+  loadAdminData: () => Promise<void>;
   loadUser: () => Promise<void>;
   setupRealtime: () => void;
 
@@ -241,8 +276,7 @@ interface AppState {
   // Upload
   uploadImage: (file: File, folder?: string, bucket?: string) => Promise<string>;
 
-  // Réservations — ✅ userId retiré (jamais réellement inséré en base) et hour → startTime/endTime
-  addReservation: (r: Omit<Reservation, "id" | "createdAt" | "status" | "userId" | "source" | "notes">) => Promise<Reservation>;
+  // Réservations : les clients réservent UNIQUEMENT via Stripe (/api/checkout).
   /** Réservation ajoutée manuellement par l'admin (accueil) : une ligne par
    *  date choisie, même horaire chaque jour. Bloque le créneau côté public. */
   addManualReservations: (data: {
@@ -255,6 +289,10 @@ interface AppState {
     email?: string;
     type: string;
     notes?: string;
+    /** Terrain réservé ; null = tout le complexe (bloque les deux terrains). */
+    fieldId?: string | null;
+    /** L'admin accepte sciemment un chevauchement (case « forcer »). */
+    force?: boolean;
     /** Montant et encaissement saisis à l'accueil (null = gratuit/interne).
      *  Porté par la PREMIÈRE date pour ne jamais compter double en compta. */
     payment?: ReceptionPayment | null;
@@ -277,9 +315,14 @@ interface AppState {
     info: { method: "terminal" | "cash" | "virement"; reference?: string }
   ) => Promise<void>;
 
-  // Événements
-  addEvent: (e: Omit<PrivateEvent, "id" | "createdAt" | "status" | "media" | "gallery">) => Promise<PrivateEvent>;
-  setEventStatus: (id: string, status: EventStatus) => Promise<void>;
+  // Événements : réponse de l'admin (accepter + lien de paiement / refuser)
+  respondToEvent: (
+    id: string,
+    payload:
+      | { action: "accept"; price: number; startTime: string; endTime: string; message?: string }
+      | { action: "decline"; reason?: string }
+      | { action: "resend" }
+  ) => Promise<{ payUrl?: string; emailSent?: boolean }>;
 
   // Disponibilités — ✅ hour → startTime/endTime
   blockSlot: (date: string, startTime: string, endTime: string, reason: string) => Promise<BlockedSlot>;
@@ -334,58 +377,67 @@ export const useAppStore = create<AppState>()(
       loadUser: async () => {
         try {
           const user = await getCurrentUser();
-          const admin = await isUserAdmin();
+          const admin = user ? await isUserAdmin() : false;
           set({ user, isAdmin: admin });
+          if (admin) {
+            await get().loadAdminData();
+          } else {
+            // Jamais de données privées dans un navigateur non admin
+            set({ reservations: [], events: [], notifications: [] });
+          }
         } catch (error) {
           console.error('❌ Erreur loadUser:', error);
-          set({ user: null, isAdmin: false });
+          set({ user: null, isAdmin: false, reservations: [], events: [], notifications: [] });
         }
       },
 
       // ============================================
-      // INITIALISATION
+      // INITIALISATION — uniquement le catalogue PUBLIC
+      // (terrains, galerie, médias, tarifs, pages…). Aucune donnée client.
       // ============================================
       loadInitialData: async () => {
         if (get().isInitialized) return;
-        
         set({ isLoading: true, error: null });
-        
         try {
-          await get().loadUser();
-
           await Promise.all([
             get().syncFields(),
             get().syncGallery(),
             get().syncMedia(),
             get().syncFieldMedia(),
-            get().syncReservations(),
-            get().syncEvents(),
             get().syncBlocked(),
             get().syncPricing(),
             get().syncRatings(),
             get().syncPages(),
-            get().syncNotifications()
           ]);
-
-          get().setupRealtime();
-
           set({ isInitialized: true, isLoading: false });
-          console.log('✅ Données initialisées avec succès');
+          // Session admin éventuelle : charge alors les données privées.
+          get().loadUser();
         } catch (error) {
           console.error('❌ Erreur chargement initial:', error);
-          set({ 
-            error: 'Erreur de connexion au serveur',
-            isLoading: false,
-            isInitialized: true
-          });
+          set({ error: 'Erreur de connexion au serveur', isLoading: false, isInitialized: true });
         }
+      },
+
+      loadAdminData: async () => {
+        if (!get().isAdmin) return;
+        await Promise.all([
+          get().syncReservations(),
+          get().syncEvents(),
+          get().syncNotifications(),
+          get().syncBlocked(),
+        ]);
+        get().setupRealtime();
       },
 
       // ============================================
       // CONFIGURATION REALTIME
       // ============================================
       setupRealtime: () => {
-        console.log('📡 Configuration des canaux Realtime...');
+        // Temps réel réservé à l'admin : les visiteurs n'ouvrent aucune
+        // connexion permanente (économise les quotas Supabase).
+        if (!get().isAdmin || typeof window === 'undefined') return;
+        if ((window as any).__sc5Realtime) return;
+        (window as any).__sc5Realtime = true;
 
         supabase
           .channel('fields-changes')
@@ -464,7 +516,6 @@ export const useAppStore = create<AppState>()(
             () => { get().syncNotifications(); })
           .subscribe();
 
-        console.log('✅ Canaux Realtime configurés');
 
         // ============================================
         // FILET DE SÉCURITÉ — si le Realtime est coupé (onglet resté ouvert
@@ -510,15 +561,7 @@ export const useAppStore = create<AppState>()(
         try {
           const { data, error } = await supabase
             .from('gallery')
-            .select(`
-              *,
-              event:private_events (
-                id,
-                first_name,
-                last_name,
-                type
-              )
-            `)
+            .select('*')
             .order('sort_order', { ascending: true });
 
           if (error) throw error;
@@ -533,15 +576,7 @@ export const useAppStore = create<AppState>()(
         try {
           const { data, error } = await supabase
             .from('media')
-            .select(`
-              *,
-              event:private_events (
-                id,
-                first_name,
-                last_name,
-                type
-              )
-            `)
+            .select('*')
             .order('created_at', { ascending: false });
 
           if (error) throw error;
@@ -595,7 +630,7 @@ export const useAppStore = create<AppState>()(
             .order('created_at', { ascending: false });
           
           if (error) throw error;
-          set({ events: data || [] });
+          set({ events: (data || []).map(mapEventFromDb) });
         } catch (error) {
           console.error('❌ Erreur syncEvents:', error);
           set({ events: [] });
@@ -748,7 +783,7 @@ export const useAppStore = create<AppState>()(
         set({ uploading: true });
         try {
           const allowedTypesByBucket: Record<string, string[]> = {
-            images: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
+            images: ['image/jpeg', 'image/png', 'image/webp'],
             media: [
               'image/jpeg', 'image/png', 'image/webp',
               'video/mp4', 'video/webm', 'video/quicktime',
@@ -891,17 +926,9 @@ export const useAppStore = create<AppState>()(
               image_url: data.imageUrl,
               alt: data.alt || 'Image de la galerie',
               sort_order: 0,
-              event_id: data.eventId || null
+              event_type: data.eventType || null
             }])
-            .select(`
-              *,
-              event:private_events (
-                id,
-                first_name,
-                last_name,
-                type
-              )
-            `)
+            .select('*')
             .single();
 
           if (error) throw error;
@@ -921,7 +948,7 @@ export const useAppStore = create<AppState>()(
             .update({
               alt: data.alt,
               sort_order: data.sortOrder,
-              event_id: data.eventId
+              event_type: data.eventType
             })
             .eq('id', id);
 
@@ -945,14 +972,10 @@ export const useAppStore = create<AppState>()(
             .eq('id', id)
             .maybeSingle();
 
-          if (image?.image_url) {
-            const path = image.image_url.split('/').pop();
-            if (path) {
-              await supabase.storage
-                .from('images')
-                .remove([`gallery/${path}`])
-                .catch(err => console.warn('⚠️ Erreur suppression storage:', err));
-            }
+          const galleryPath = storagePathFromUrl(image?.image_url, 'images');
+          if (galleryPath) {
+            const { error: rmErr } = await supabase.storage.from('images').remove([galleryPath]);
+            if (rmErr) console.warn('⚠️ Image non supprimée du stockage:', rmErr.message);
           }
 
           const { error } = await supabase
@@ -1003,17 +1026,9 @@ export const useAppStore = create<AppState>()(
               duration: data.duration || null,
               description: data.description || null,
               is_featured: data.isFeatured || false,
-              event_id: data.eventId || null
+              event_type: data.eventType || null
             }])
-            .select(`
-              *,
-              event:private_events (
-                id,
-                first_name,
-                last_name,
-                type
-              )
-            `)
+            .select('*')
             .single();
 
           if (error) throw error;
@@ -1038,7 +1053,7 @@ export const useAppStore = create<AppState>()(
               duration: data.duration,
               description: data.description,
               is_featured: data.isFeatured,
-              event_id: data.eventId
+              event_type: data.eventType
             })
             .eq('id', id);
 
@@ -1062,24 +1077,13 @@ export const useAppStore = create<AppState>()(
             .eq('id', id)
             .maybeSingle();
 
-          if (media?.url) {
-            const path = media.url.split('/').pop();
-            if (path) {
-              await supabase.storage
-                .from('media')
-                .remove([`videos/${path}`])
-                .catch(err => console.warn('⚠️ Erreur suppression media:', err));
-            }
-          }
-
-          if (media?.thumbnail) {
-            const thumbPath = media.thumbnail.split('/').pop();
-            if (thumbPath) {
-              await supabase.storage
-                .from('media')
-                .remove([`thumbnails/${thumbPath}`])
-                .catch(err => console.warn('⚠️ Erreur suppression thumbnail:', err));
-            }
+          // Supprime les fichiers du stockage (rien à faire pour un lien YouTube/Vimeo)
+          const paths = [media?.url, media?.thumbnail]
+            .map((u) => storagePathFromUrl(u, 'media'))
+            .filter((p): p is string => !!p);
+          if (paths.length) {
+            const { error: rmErr } = await supabase.storage.from('media').remove(paths);
+            if (rmErr) console.warn('⚠️ Fichier média non supprimé du stockage:', rmErr.message);
           }
 
           const { error } = await supabase
@@ -1180,42 +1184,6 @@ export const useAppStore = create<AppState>()(
       // ============================================
       // RÉSERVATIONS — ✅ startTime/endTime au lieu de hour
       // ============================================
-      addReservation: async (r) => {
-        try {
-          const { data, error } = await supabase
-            .from('reservations')
-            .insert([{
-              user_name: r.userName,
-              user_email: r.userEmail,
-              user_phone: r.userPhone,
-              date: r.date,
-              start_time: r.startTime,
-              end_time: r.endTime,
-              end_date: r.endDate || null,
-              price: r.price,
-              tax_gst: r.taxGst,
-              tax_qst: r.taxQst,
-              total: r.total,
-              type: r.type || 'Terrain',
-              guests: r.guests,
-              payment_option: r.paymentOption,
-              amount_paid: r.amountPaid,
-              balance_due: r.balanceDue,
-              status: 'confirmed'
-            }])
-            .select()
-            .single();
-
-          if (error) throw error;
-          
-          await get().syncReservations();
-          return mapReservationFromDb(data);
-        } catch (error) {
-          console.error('❌ Erreur addReservation:', error);
-          throw error;
-        }
-      },
-
       addManualReservations: async (data) => {
         const name = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
         const email = data.email?.trim() || "";
@@ -1228,6 +1196,8 @@ export const useAppStore = create<AppState>()(
           const carries = p !== null && i === 0;
           const balance = carries ? Math.round((p!.total - p!.received) * 100) / 100 : 0;
           return {
+            field_id: data.fieldId || null,
+            allow_overlap: !!data.force,
             user_name: name,
             user_email: email,
             user_phone: data.phone,
@@ -1384,68 +1354,21 @@ export const useAppStore = create<AppState>()(
       // ============================================
       // ÉVÉNEMENTS
       // ============================================
-      addEvent: async (e) => {
-        try {
-          const { error } = await supabase
-            .from('private_events')
-            .insert([{
-              first_name: e.firstName,
-              last_name: e.lastName,
-              company: e.company || null,
-              phone: e.phone,
-              email: e.email,
-              date: e.date,
-              guests: e.guests,
-              type: e.type,
-              message: e.message,
-              status: 'new'
-            }]);
-
-          if (error) throw error;
-
-          // ✅ Pas de .select() après l'insert : un visiteur public n'a pas
-          // (et ne doit pas avoir) de droit SELECT sur private_events, qui
-          // contient des coordonnées personnelles. Demander à relire la ligne
-          // juste insérée provoquait une fausse violation RLS.
-          // On tente quand même de resynchroniser la liste admin si l'appelant
-          // est déjà admin (sinon ça échoue silencieusement, sans bloquer).
-          get().syncEvents().catch(() => {});
-
-          return {
-            id: '',
-            firstName: e.firstName,
-            lastName: e.lastName,
-            company: e.company,
-            phone: e.phone,
-            email: e.email,
-            date: e.date,
-            guests: e.guests,
-            type: e.type,
-            message: e.message,
-            status: 'new',
-            createdAt: new Date().toISOString(),
-            media: [],
-            gallery: [],
-          } as PrivateEvent;
-        } catch (error) {
-          console.error('❌ Erreur addEvent:', error);
-          throw error;
-        }
-      },
-
-      setEventStatus: async (id, status) => {
-        try {
-          const { error } = await supabase
-            .from('private_events')
-            .update({ status })
-            .eq('id', id);
-
-          if (error) throw error;
-          await get().syncEvents();
-        } catch (error) {
-          console.error('❌ Erreur setEventStatus:', error);
-          throw error;
-        }
+      respondToEvent: async (id, payload) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Session expirée : reconnectez-vous.');
+        const res = await fetch(`/api/admin/event-requests/${id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || 'Action impossible');
+        await get().syncEvents();
+        return { payUrl: json.payUrl, emailSent: json.emailSent };
       },
 
       // ============================================
@@ -1521,24 +1444,14 @@ export const useAppStore = create<AppState>()(
       // ÉVALUATIONS
       // ============================================
       addRating: async (rating: number, comment?: string) => {
-        try {
-          const { data, error } = await supabase
-            .from('ratings')
-            .insert([{
-              rating,
-              comment: comment || ''
-            }])
-            .select()
-            .single();
-
-          if (error) throw error;
-          
-          await get().syncRatings();
-          return data;
-        } catch (error) {
-          console.error('❌ Erreur addRating:', error);
-          throw error;
-        }
+        const res = await fetch('/api/rating', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rating, comment: comment || '' }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || "La note n'a pas pu être enregistrée.");
+        await get().syncRatings();
       },
 
       // ============================================
@@ -1637,30 +1550,26 @@ export const useAppStore = create<AppState>()(
           user: null,
           isAdmin: false
         });
-        localStorage.removeItem('soccer-city-store');
+        localStorage.removeItem('soccer-city-store-v2');
       },
     }),
     {
-      name: 'soccer-city-store',
+      name: 'soccer-city-store-v2',
       partialize: (state) => ({
+        // ⚠️ Uniquement le catalogue public : aucune donnée client
+        // (réservations, demandes, notifications) n'est gardée dans le navigateur.
         fields: state.fields,
         gallery: state.gallery,
         media: state.media,
         fieldMedia: state.fieldMedia,
-        reservations: state.reservations,
-        events: state.events,
-        blocked: state.blocked,
-        notifications: state.notifications,
         pricing: state.pricing,
-        ratings: state.ratings,
         pages: state.pages
       })
     }
   )
 );
 
-// Exposer le store globalement pour le débogage
+// Nettoie l'ancien cache qui contenait des données clients.
 if (typeof window !== 'undefined') {
-  // @ts-ignore
-  window.__STORE = useAppStore;
+  try { localStorage.removeItem('soccer-city-store'); } catch {}
 }

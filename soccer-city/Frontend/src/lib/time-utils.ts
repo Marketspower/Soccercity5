@@ -55,9 +55,11 @@ export function computeSpanHours(
   endDateISO: string,
   endTime: string
 ): number {
-  const start = combineDateTime(startDateISO, startTime);
-  const end = combineDateTime(endDateISO, endTime);
-  return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+  // Heures « de calendrier » (UTC naïf) : même calcul que le serveur,
+  // pour que le prix affiché = le prix payé, même lors d'un changement d'heure.
+  const start = new Date(`${startDateISO}T${startTime}:00Z`).getTime();
+  const end = new Date(`${endDateISO}T${endTime}:00Z`).getTime();
+  return (end - start) / (1000 * 60 * 60);
 }
 
 /** Formate une durée en heures (ex: 51.5) en texte lisible ("2 j 3 h 30"). */
@@ -85,4 +87,22 @@ export function spansOverlap(
   const bStart = combineDateTime(startB, startTimeB).getTime();
   const bEnd = combineDateTime(endB, endTimeB).getTime();
   return aStart < bEnd && aEnd > bStart;
+}
+/** Date (YYYY-MM-DD) et minute actuelles à Montréal — pour masquer les heures déjà passées. */
+export function montrealNow(): { date: string; minutes: number } {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(now);
+  const [h, m] = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(now).split(":").map(Number);
+  return { date, minutes: h * 60 + m };
+}
+
+/** Garde seulement les heures de début encore possibles si la date est aujourd'hui. */
+export function futureStartTimes(options: string[], dates: string[]): string[] {
+  const { date, minutes } = montrealNow();
+  if (!dates.includes(date)) return options;
+  return options.filter((t) => timeToMinutes(t) > minutes);
 }

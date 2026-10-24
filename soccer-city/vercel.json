@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "Frontend/$1"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/event-requests",
+      "schedule": "0 12 * * *"
+    }
   ]
 }
