@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 
-const LINKS = [
+const LINKS: { href: string; label: string; highlight?: boolean }[] = [
   { href: "/#terrains", label: "Terrains" },
   { href: "/#tarifs", label: "Tarifs" },
   { href: "/forfaits", label: "Forfaits" },
   { href: "/#galerie", label: "Galerie" },
-  { href: "/evenements", label: "Événements" },
+  { href: "/evenements", label: "Événements", highlight: true },
   { href: "/#contact", label: "Contact" },
 ];
 
@@ -59,7 +59,12 @@ export function Navbar() {
             <Link
               key={l.href}
               href={l.href}
-              className="font-display text-xs font-bold uppercase italic tracking-widest text-white/70 hover:text-primary transition-colors"
+              className={cn(
+                "font-display text-xs font-bold uppercase italic tracking-widest transition-colors",
+                l.highlight
+                  ? "rounded-md bg-primary px-3 py-2 text-white hover:bg-primary/85"
+                  : "text-white/70 hover:text-primary"
+              )}
             >
               {l.label}
             </Link>
@@ -125,7 +130,10 @@ export function Navbar() {
               <Link
                 key={l.href}
                 href={l.href}
-                className="py-3 text-white/80 hover:text-white transition-colors text-lg font-medium"
+                className={cn(
+                  "py-3 transition-colors text-lg font-medium",
+                  l.highlight ? "text-primary hover:text-primary/80 font-bold" : "text-white/80 hover:text-white"
+                )}
                 onClick={() => setOpen(false)}
               >
                 {l.label}
