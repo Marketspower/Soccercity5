@@ -1,8 +1,7 @@
 "use client";
 
 import {
-  Coffee, CircleParking, DoorOpen, Dumbbell, Lightbulb, Sandwich,
-  ShowerHead, Tv, Volleyball, Wifi, Megaphone,
+  CircleParking, DoorOpen, Lightbulb, ShowerHead, Volleyball, Wifi,
 } from "lucide-react";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 
@@ -10,13 +9,8 @@ const SERVICES = [
   { Icon: DoorOpen, label: "Vestiaires" },
   { Icon: CircleParking, label: "Parking gratuit" },
   { Icon: Lightbulb, label: "Éclairage LED" },
-  { Icon: Sandwich, label: "Snack" },
-  { Icon: Coffee, label: "Cafétéria" },
   { Icon: ShowerHead, label: "Douches" },
   { Icon: Volleyball, label: "Location de ballons" },
-  { Icon: Megaphone, label: "Arbitres certifiés" },
-  { Icon: Dumbbell, label: "Coaching" },
-  { Icon: Tv, label: "Écran géant" },
   { Icon: Wifi, label: "Wi-Fi gratuit" },
 ];
 
@@ -30,7 +24,7 @@ export function Services() {
           <h2 className="display text-4xl sm:text-5xl">Tout est <span className="text-primary">inclus</span> dans l&apos;expérience</h2>
         </Reveal>
 
-        <Stagger className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        <Stagger className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
           {SERVICES.map(({ Icon, label }) => (
             <StaggerItem key={label}>
               <div className="group flex flex-col items-center gap-3 rounded-lg glass p-6 text-center transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/50 hover:shadow-glow-sm">
