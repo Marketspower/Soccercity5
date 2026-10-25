@@ -9,9 +9,11 @@
 //      • 2 jours après l'acceptation → relance de paiement (une seule fois)
 //      • date de l'événement passée → « expired »
 // 3. RAPPEL DE RÉSERVATION — courriel au client la veille.
+// 4. DEMANDE D'AVIS — courriel au client le lendemain de sa visite.
 //
 // Toutes les dates sont calculées dans le fuseau de Montréal.
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { getSupabaseAdmin } from "@/lib/server/supabase-admin";
 import { todayMontreal, addDays, daysBetween, TIMEZONE } from "@/lib/server/validation";
 import { computeTaxes, loadTaxSettings } from "@/lib/taxes";
@@ -21,6 +23,7 @@ import {
   sendAdminPendingRequestEmail,
   sendReservationReminderEmail,
   sendEventPaymentReminderEmail,
+  sendReviewRequestEmail,
 } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +53,7 @@ export async function GET(req: NextRequest) {
 
   const supabaseAdmin = getSupabaseAdmin();
   const today = todayMontreal();
-  const report = { reminders: 0, expired: 0, paymentReminders: 0, acceptedExpired: 0, bookingReminders: 0, errors: 0 };
+  const report = { reminders: 0, expired: 0, paymentReminders: 0, acceptedExpired: 0, bookingReminders: 0, reviewRequests: 0, errors: 0 };
 
   // ===================== 1. Demandes « new » =====================
   const { data: pending, error: pendErr } = await supabaseAdmin
@@ -205,6 +208,59 @@ export async function GET(req: NextRequest) {
         report.bookingReminders++;
       } catch (e) {
         console.error("❌ Cron — rappel réservation:", e);
+        report.errors++;
+      }
+    }
+  }
+
+  // ===================== 4. Demandes d'avis (lendemain) =====================
+  // Une seule demande par client et par jour, jamais deux fois pour la même
+  // réservation ; on ne relance pas un client déjà sollicité ces 30 derniers jours.
+  const yesterday = addDays(today, -1);
+  const { data: visits, error: visitsErr } = await supabaseAdmin
+    .from("reservations")
+    .select("id, user_name, user_email, date, start_time")
+    .eq("date", yesterday)
+    .eq("status", "confirmed")
+    .is("review_request_sent_at", null)
+    .not("user_email", "is", null)
+    .neq("user_email", "");
+
+  if (visitsErr) {
+    console.error("❌ Cron — lecture visites (avis):", visitsErr.message);
+  } else {
+    const byEmail = new Map<string, any[]>();
+    for (const r of visits ?? []) {
+      const key = String(r.user_email).toLowerCase();
+      byEmail.set(key, [...(byEmail.get(key) ?? []), r]);
+    }
+    const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    for (const [email, rows] of Array.from(byEmail.entries())) {
+      try {
+        const ids = rows.map((r) => r.id);
+        const { count: recent } = await supabaseAdmin
+          .from("reservations")
+          .select("id", { count: "exact", head: true })
+          .ilike("user_email", email)
+          .gte("review_request_sent_at", since);
+        if ((recent ?? 0) > 0) {
+          // Déjà sollicité récemment : on marque sans envoyer
+          await supabaseAdmin.from("reservations").update({ review_request_sent_at: new Date().toISOString() }).in("id", ids);
+          continue;
+        }
+        const token = randomBytes(18).toString("base64url");
+        const firstName = String(rows[0].user_name || "").trim().split(" ")[0] || "cher client";
+        const sent = await sendReviewRequestEmail({
+          userName: firstName,
+          userEmail: rows[0].user_email,
+          reviewUrl: `${siteUrl}/avis?t=${encodeURIComponent(token)}`,
+        });
+        if (!sent) { report.errors++; continue; }
+        await supabaseAdmin.from("reservations").update({ review_token: token }).eq("id", rows[0].id);
+        await supabaseAdmin.from("reservations").update({ review_request_sent_at: new Date().toISOString() }).in("id", ids);
+        report.reviewRequests++;
+      } catch (e) {
+        console.error("❌ Cron — demande d'avis:", e);
         report.errors++;
       }
     }

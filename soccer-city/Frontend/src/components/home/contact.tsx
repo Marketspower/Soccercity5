@@ -30,13 +30,28 @@ const INFOS = [
 
 export function Contact() {
   const [sent, setSent] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [website, setWebsite] = useState(""); // champ piège anti-robot
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema)
   });
 
-  const onSubmit = async () => {
-    await new Promise((r) => setTimeout(r, 700));
-    setSent(true);
+  // Envoi réel : le message arrive par courriel à l'équipe (« Répondre »
+  // répond directement au client), et le client reçoit un accusé de réception.
+  const onSubmit = async (values: FormValues) => {
+    setSubmitError("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, website, source: "formulaire de contact" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Envoi impossible.");
+      setSent(true);
+    } catch (err: any) {
+      setSubmitError(err.message || "Le message n'a pas pu être envoyé.");
+    }
   };
 
   return (
@@ -86,10 +101,13 @@ export function Contact() {
                   <Check className="size-8" />
                 </span>
                 <h3 className="display text-2xl">Message envoyé</h3>
-                <p className="mt-2 text-sm text-muted-foreground">Notre équipe vous répond sous 24 h ouvrables.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Merci ! Un accusé de réception vient de vous être envoyé par courriel. Notre équipe vous répond rapidement.</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+              <form onSubmit={handleSubmit(onSubmit)} className="relative space-y-5" noValidate>
+                <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
+                  <label>Site web<input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} /></label>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="c-name">Nom complet</Label>
                   <Input id="c-name" placeholder="Alex Tremblay" autoComplete="name" {...register("name")} />
@@ -105,6 +123,9 @@ export function Contact() {
                   <Textarea id="c-message" placeholder="Bonjour, j'aimerais…" {...register("message")} />
                   {errors.message && <p className="text-xs text-destructive">{errors.message.message}</p>}
                 </div>
+                {submitError && (
+                  <p className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">{submitError}</p>
+                )}
                 <Button type="submit" variant="brand" size="lg" className="w-full" disabled={isSubmitting}>
                   <Send /> {isSubmitting ? "Envoi en cours…" : "Envoyer le message"}
                 </Button>

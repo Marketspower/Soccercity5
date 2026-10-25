@@ -68,14 +68,19 @@ function button(href: string, label: string): string {
 }
 
 /** Envoi unique : renvoie true si Resend a accepté le courriel. */
-async function send(to: string | undefined | null, subject: string, html: string): Promise<boolean> {
+async function send(
+  to: string | undefined | null,
+  subject: string,
+  html: string,
+  replyTo: string = REPLY_TO
+): Promise<boolean> {
   if (!to) return false;
   if (!resend) {
     console.warn("⚠️ RESEND_API_KEY manquant : courriel non envoyé —", subject);
     return false;
   }
   try {
-    const { error } = await resend.emails.send({ from: FROM_EMAIL, replyTo: REPLY_TO, to, subject, html });
+    const { error } = await resend.emails.send({ from: FROM_EMAIL, replyTo, to, subject, html });
     if (error) {
       console.error("❌ Resend a refusé le courriel :", subject, error);
       return false;
@@ -433,6 +438,73 @@ export async function sendReservationReminderEmail(p: ReservationReminderParams)
               Payable à l'accueil (carte, comptant ou virement) avant l'accès au terrain.</p>`
          : ""}
        <p>Pensez à arriver une dizaine de minutes à l'avance. Bonne séance !</p>`
+    )
+  );
+}
+
+// =====================================================================
+// AVIS CLIENTS
+// =====================================================================
+
+/** Lendemain de la visite : demande d'avis au client. */
+export async function sendReviewRequestEmail(p: { userName: string; userEmail: string; reviewUrl: string }) {
+  return send(
+    p.userEmail,
+    "Comment s'est passé votre match chez Soccer City ? ⚽",
+    layout(
+      `Merci de votre visite, ${esc(p.userName)} !`,
+      `<p>Nous espérons que vous avez passé un excellent moment sur nos terrains.</p>
+       <p>Votre avis compte beaucoup pour nous et aide d'autres joueurs à nous découvrir.
+       Ça prend moins d'une minute :</p>
+       ${button(p.reviewUrl, "Donner mon avis")}
+       <p style="color:#666;font-size:13px;">Une remarque à nous faire en privé ? Répondez simplement à ce courriel.</p>`
+    )
+  );
+}
+
+/** Nouvel avis reçu : à approuver dans l'admin. */
+export async function sendAdminNewReviewEmail(p: { author: string; rating: number; text: string; verified: boolean }) {
+  const stars = "★".repeat(p.rating) + "☆".repeat(5 - p.rating);
+  return send(
+    ADMIN_EMAIL,
+    `Nouvel avis ${stars} de ${p.author} — à approuver`,
+    layout(
+      "Nouvel avis en attente",
+      `<p><strong>${esc(p.author)}</strong>${p.verified ? " · ✅ client vérifié" : ""}</p>
+       <p style="font-size:20px;color:#f59e0b;margin:4px 0;">${stars}</p>
+       <p style="padding:12px;background:#f5f5f5;border-radius:6px;white-space:pre-wrap;">${esc(p.text)}</p>
+       <p>Il ne sera visible sur le site qu'après votre approbation.</p>
+       ${SITE_URL ? button(`${SITE_URL}/admin/avis`, "Approuver ou refuser") : ""}`
+    )
+  );
+}
+
+// =====================================================================
+// FORMULAIRE DE CONTACT
+// =====================================================================
+
+export async function sendContactMessageEmail(p: { name: string; email: string; message: string; source?: string }) {
+  return send(
+    ADMIN_EMAIL,
+    `Nouveau message de ${p.name}${p.source ? ` (${p.source})` : ""}`,
+    layout(
+      "Nouveau message du site",
+      `<p><strong>${esc(p.name)}</strong> — ${esc(p.email)}</p>
+       <p style="padding:12px;background:#f5f5f5;border-radius:6px;white-space:pre-wrap;">${esc(p.message)}</p>
+       <p style="color:#666;font-size:13px;">Cliquez sur « Répondre » : votre réponse partira directement au client.</p>`
+    ),
+    p.email
+  );
+}
+
+export async function sendContactAckEmail(p: { name: string; email: string }) {
+  return send(
+    p.email,
+    "Nous avons bien reçu votre message — Soccer City",
+    layout(
+      "Message reçu !",
+      `<p>Bonjour ${esc(p.name)},</p>
+       <p>Merci pour votre message. Notre équipe vous répond par courriel dans les meilleurs délais.</p>`
     )
   );
 }

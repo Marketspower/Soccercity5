@@ -1,5 +1,6 @@
 // components/home/fields.tsx
 "use client";
+import { fieldUrlKey } from "@/lib/field-url";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -81,12 +82,12 @@ function FieldCard({ field }: { field: Field }) {
 
         <div className="mt-6 flex gap-3">
           <Button asChild variant="outline" className="flex-1">
-            <Link href={`/reservation?terrain=${field.id}`}>
+            <Link href={`/reservation?terrain=${fieldUrlKey(field)}&vue=dispo`}>
               <CalendarSearch className="size-4" /> Disponibilités
             </Link>
           </Button>
           <Button asChild variant="brand" className="flex-1">
-            <Link href={`/reservation?terrain=${field.id}`}>
+            <Link href={`/reservation?terrain=${fieldUrlKey(field)}`}>
               <Zap className="size-4" /> Réserver
             </Link>
           </Button>

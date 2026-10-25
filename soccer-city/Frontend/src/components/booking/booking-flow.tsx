@@ -1,10 +1,12 @@
 // components/booking/booking-flow.tsx
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startOfToday } from "date-fns";
 import { useAppStore } from "@/lib/store";
 import { toISODate } from "@/lib/utils";
 import type { Field } from "@/lib/types";
+import { fieldUrlKey, normalizeKey } from "@/lib/field-url";
 import { DatePicker } from "./date-picker";
 import { TimeRangePicker, type TimeRangeValue } from "./time-range-picker";
 import { MultiDayPicker, type MultiDayValue } from "./multi-day-picker";
@@ -25,11 +27,56 @@ import type { PaymentOption } from "@/lib/types";
 
 type Mode = "single" | "multi" | "dates";
 
+/** Valeurs acceptées dans l'adresse : ?mode=jour | continu | dates */
+const MODE_FROM_URL: Record<string, Mode> = {
+  single: "single", jour: "single", journee: "single",
+  multi: "multi", continu: "multi", periode: "multi",
+  dates: "dates", choix: "dates",
+};
+const MODE_TO_URL: Record<Mode, string> = { single: "jour", multi: "continu", dates: "dates" };
+
+const normalize = normalizeKey;
+
+/**
+ * Parcours de réservation.
+ * L'adresse pilote l'étape : /reservation → choix du terrain ;
+ * /reservation?terrain=grand-terrain → directement date et horaire de ce terrain.
+ * Options : &mode=jour|continu|dates, &vue=dispo (défile jusqu'au calendrier).
+ */
 export function BookingFlow() {
-  const { fields } = useAppStore();
+  const { fields, isInitialized } = useAppStore();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const terrainParam = searchParams.get("terrain");
+  const modeParam = searchParams.get("mode");
+  const vueParam = searchParams.get("vue");
+
   const [step, setStep] = useState(0);
-  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>("single");
+  const [mode, setMode] = useState<Mode>(() => MODE_FROM_URL[normalize(modeParam || "")] ?? "single");
+
+  // Terrain désigné par l'adresse (id, slug ou nom), parmi les terrains actifs
+  const urlField = useMemo(() => {
+    if (!terrainParam) return null;
+    const key = normalize(terrainParam);
+    return (
+      fields.find(
+        (f: Field) =>
+          f.active !== false &&
+          (f.id === terrainParam || fieldUrlKey(f) === key || normalize(f.name || "") === key)
+      ) ?? null
+    );
+  }, [fields, terrainParam]);
+  const selectedFieldId = urlField?.id ?? null;
+  const fieldsReady = isInitialized || fields.length > 0;
+  const invalidTerrain = !!terrainParam && fieldsReady && !urlField;
+
+  const goToField = (f: Field) => {
+    const qs = new URLSearchParams({ terrain: fieldUrlKey(f) });
+    if (mode !== "single") qs.set("mode", MODE_TO_URL[mode]);
+    router.push(`${pathname}?${qs.toString()}`, { scroll: false });
+  };
+  const goToPicker = () => router.push(pathname, { scroll: false });
 
   // Mode 1 jour
   const [date, setDate] = useState<Date>(startOfToday());
@@ -61,6 +108,45 @@ export function BookingFlow() {
   const [error, setError] = useState("");
 
   const selectedField = fields.find((f: Field) => f.id === selectedFieldId);
+
+  // L'adresse décide de l'étape (le bouton Retour du navigateur fonctionne) ;
+  // changer de terrain remet les choix de date/heure à zéro.
+  const lastFieldId = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedFieldId !== lastFieldId.current) {
+      lastFieldId.current = selectedFieldId;
+      setRange({ startTime: null, endTime: null });
+      setMultiDay({ startDate: null, startTime: null, endDate: null, endTime: null });
+      setMultiDates({ dates: [], startTime: null, endTime: null });
+      setError("");
+    }
+    setStep(selectedFieldId ? (s) => (s === 0 ? 1 : s) : 0);
+  }, [selectedFieldId]);
+
+  // Mode demandé dans l'adresse (ex. publicité « tous vos vendredis » → ?mode=dates)
+  useEffect(() => {
+    const m = MODE_FROM_URL[normalize(modeParam || "")];
+    if (m) setMode(m);
+  }, [modeParam]);
+
+  // Garde le mode dans l'adresse : lien partageable tel quel
+  const changeMode = (m: Mode) => {
+    setMode(m);
+    if (!selectedField) return;
+    const qs = new URLSearchParams(searchParams.toString());
+    if (m === "single") qs.delete("mode");
+    else qs.set("mode", MODE_TO_URL[m]);
+    router.replace(`${pathname}?${qs.toString()}`, { scroll: false });
+  };
+
+  // « Disponibilités » : défile jusqu'au calendrier
+  useEffect(() => {
+    if (step !== 1 || vueParam !== "dispo") return;
+    const t = setTimeout(() => {
+      document.getElementById("calendrier")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [step, vueParam]);
 
   const isReady =
     mode === "single"
@@ -160,23 +246,27 @@ export function BookingFlow() {
     }
   };
 
+  // Lien vers un terrain précis, terrains pas encore chargés : on patiente
+  if (terrainParam && !fieldsReady) {
+    return <div className="mx-auto h-96 max-w-4xl animate-pulse rounded-lg bg-card" aria-busy="true" />;
+  }
+
   // Étape 0 : choix du terrain
-  if (step === 0) {
+  if (step === 0 || !selectedField) {
     return (
       <div className="max-w-4xl mx-auto">
+        {invalidTerrain && (
+          <p className="mb-4 rounded-md bg-amber-500/10 px-4 py-3 text-sm text-amber-500">
+            Ce terrain n&apos;est plus disponible. Choisissez-en un autre ci-dessous.
+          </p>
+        )}
         <h2 className="text-2xl font-bold mb-6">Choisissez votre terrain</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {fields.filter((f: Field) => f.active).map((f: Field) => (
             <button
               key={f.id}
               type="button"
-              onClick={() => {
-                setSelectedFieldId(f.id);
-                setRange({ startTime: null, endTime: null });
-                setMultiDay({ startDate: null, startTime: null, endDate: null, endTime: null });
-                setMultiDates({ dates: [], startTime: null, endTime: null });
-                setStep(1);
-              }}
+              onClick={() => goToField(f)}
               className="group overflow-hidden rounded-lg border bg-card text-left transition-all hover:shadow-glow-sm"
             >
               <div className="p-4">
@@ -197,16 +287,20 @@ export function BookingFlow() {
   if (step === 1 && selectedField) {
     return (
       <div className="max-w-4xl mx-auto">
-        <button onClick={() => setStep(0)} className="mb-4 text-sm text-primary hover:underline">
+        <button onClick={goToPicker} className="mb-4 text-sm text-primary hover:underline">
           ← Changer de terrain
         </button>
-        <h2 className="text-2xl font-bold mb-2">{selectedField.name}</h2>
+        <h2 id="calendrier" className="scroll-mt-28 text-2xl font-bold md:scroll-mt-32">{selectedField.name}</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          {selectedField.players} · {selectedField.turf} ·{" "}
+          <span className="font-bold text-primary">{selectedField.pricePerHour} $/h</span>
+        </p>
 
         {/* Bascule 1 jour / plusieurs jours */}
         <div className="mb-6 inline-flex rounded-md border p-1">
           <button
             type="button"
-            onClick={() => setMode("single")}
+            onClick={() => changeMode("single")}
             className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${
               mode === "single" ? "bg-primary text-white" : "text-muted-foreground"
             }`}
@@ -215,7 +309,7 @@ export function BookingFlow() {
           </button>
           <button
             type="button"
-            onClick={() => setMode("multi")}
+            onClick={() => changeMode("multi")}
             className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${
               mode === "multi" ? "bg-primary text-white" : "text-muted-foreground"
             }`}
@@ -224,7 +318,7 @@ export function BookingFlow() {
           </button>
           <button
             type="button"
-            onClick={() => setMode("dates")}
+            onClick={() => changeMode("dates")}
             className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${
               mode === "dates" ? "bg-primary text-white" : "text-muted-foreground"
             }`}

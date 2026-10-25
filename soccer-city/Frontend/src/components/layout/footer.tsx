@@ -16,6 +16,7 @@ const NAV = [
     { href: "/reservation", label: "Réserver un terrain" },
     { href: "/evenements", label: "Organiser un événement" },
     { href: "/#faq", label: "FAQ" },
+    { href: "/avis", label: "Laisser un avis" },
     { href: "/#contact", label: "Nous joindre" },
   ]},
   { title: "Légal", links: [
