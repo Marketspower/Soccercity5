@@ -6,7 +6,7 @@ const EVENT_TYPES = ["Anniversaire", "Tournoi", "Entreprise", "École", "Événe
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const pages = ["", "/reservation", "/evenements", "/forfaits", "/forfaits/anniversaire", "/forfaits/academie", "/mentions-legales", "/confidentialite"];
+  const pages = ["", "/reservation", "/evenements", "/forfaits", "/forfaits/anniversaire", "/forfaits/academie", "/mentions-legales", "/confidentialite", "/conditions"];
   return [
     ...pages.map((p) => ({
       url: `${SITE_URL}${p}`,

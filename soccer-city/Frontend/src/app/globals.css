@@ -430,3 +430,16 @@
     padding-top: 5rem;
   }
 }
+/* ===== Contenu des pages du CMS (politique, conditions…) ===== */
+.cms-content { font-size: 0.9rem; line-height: 1.75; color: hsl(var(--muted-foreground)); }
+.cms-content h2 { margin: 2.25rem 0 0.75rem; font-size: 1.15rem; font-weight: 700; color: hsl(var(--foreground)); scroll-margin-top: 7rem; }
+.cms-content h3 { margin: 1.5rem 0 0.5rem; font-size: 1rem; font-weight: 600; color: hsl(var(--foreground)); }
+.cms-content p { margin: 0.75rem 0; }
+.cms-content ul, .cms-content ol { margin: 0.75rem 0; padding-left: 1.4rem; }
+.cms-content ul { list-style: disc; }
+.cms-content ol { list-style: decimal; }
+.cms-content li { margin: 0.35rem 0; }
+.cms-content strong { color: hsl(var(--foreground)); }
+.cms-content a { color: hsl(var(--primary)); text-decoration: underline; }
+.cms-content nav { margin: 1.5rem 0; padding: 1rem 1.25rem; border: 1px solid hsl(var(--border)); border-radius: 0.5rem; background: hsl(var(--card)); }
+.cms-content nav ol { margin: 0.25rem 0 0; }

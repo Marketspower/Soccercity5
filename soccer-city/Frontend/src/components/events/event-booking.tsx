@@ -25,6 +25,7 @@ import {
   type TaxSettings, type PaymentSettings,
 } from "@/lib/taxes";
 import { PaymentOptions } from "@/components/booking/payment-options";
+import { TermsConsent } from "@/components/booking/terms-consent";
 import type { EventType, PaymentOption } from "@/lib/types";
 import type { EventPackage } from "@/config/packages";
 import { loadEventPrices } from "@/lib/event-prices";
@@ -61,6 +62,8 @@ export function EventBooking({
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [paySettings, setPaySettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [payOption, setPayOption] = useState<PaymentOption>("full");
+  // Consentement aux conditions et à la politique (obligatoire avant paiement)
+  const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -142,6 +145,7 @@ export function EventBooking({
           userEmail: form.email,
           userPhone: form.phone,
           paymentOption: payOption,
+              acceptTerms: accepted,
         }),
       });
       const data = await res.json();
@@ -317,9 +321,11 @@ export function EventBooking({
 
       <PaymentOptions taxes={taxes} settings={paySettings} value={payOption} onChange={setPayOption} />
 
+      <TermsConsent checked={accepted} onChange={setAccepted} />
+
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Button variant="brand" className="w-full" size="lg" disabled={loading} onClick={pay}>
+      <Button variant="brand" className="w-full" size="lg" disabled={loading || !accepted} onClick={pay}>
         {loading
           ? "Redirection vers le paiement…"
           : payOption === "deposit" && taxes.subtotal >= paySettings.depositMinSubtotal

@@ -11,7 +11,7 @@ export const CONTACT = {
   phone: "+1 (514) 965-9693",
   whatsapp: "+1 (514) 965-9693",
   email: "soccercity5.mtl@gmail.com",
-  address: "835 Rue Saint-Jacques Saint-Jean-sur-Richelieu, QC J3B 2N2",
+  address: "835, rue Saint-Jacques, Saint-Jean-sur-Richelieu (QC) J3B 2N2",
   hours: "Tous les jours · 8 h – 23 h",
   mapsQuery: "835 Rue Saint-Jacques, Saint-Jean-sur-Richelieu, QC J3B 2N2",
 };

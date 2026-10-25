@@ -5,7 +5,7 @@ import { Navbar } from "./navbar";
 import { Footer } from "./footer";
 
 // Pages où le navbar et footer ne doivent pas s'afficher
-const HIDE_NAV_FOOTER_PATHS = ["/admin", "/confidentialite", "/conditions"];
+const HIDE_NAV_FOOTER_PATHS = ["/admin"];
 
 export function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

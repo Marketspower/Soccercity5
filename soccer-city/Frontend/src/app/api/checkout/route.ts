@@ -52,6 +52,9 @@ export async function POST(req: NextRequest) {
     const guestsNum = Number(body.guests);
     const guests = Number.isInteger(guestsNum) && guestsNum > 0 && guestsNum <= 500 ? guestsNum : null;
 
+    if (body.acceptTerms !== true) {
+      return bad("Veuillez accepter les conditions d'utilisation et la politique de confidentialité.");
+    }
     if (!userName || userName.length < 2) return bad("Veuillez indiquer votre nom.");
     if (!isEmail(userEmail)) return bad("Adresse courriel invalide.");
     if (!isPhone(userPhone)) return bad("Numéro de téléphone invalide.");
@@ -283,6 +286,8 @@ export async function POST(req: NextRequest) {
         paymentOption: wantsDeposit ? "deposit" : "full",
         amountPaid: String(amountToPay),
         balanceDue: String(balanceDue),
+        // Preuve du consentement (date et heure d'acceptation)
+        termsAcceptedAt: new Date().toISOString(),
         ...metaExtra,
       },
       success_url: `${origin}/reservation/success?session_id={CHECKOUT_SESSION_ID}`,

@@ -17,6 +17,7 @@ import {
 } from "@/lib/taxes";
 import { ACADEMIE, type AcademyGroup } from "@/config/packages";
 import { PaymentOptions } from "@/components/booking/payment-options";
+import { TermsConsent } from "@/components/booking/terms-consent";
 import type { PaymentOption } from "@/lib/types";
 
 const fmt = (n: number) => `${n.toFixed(2)} $`;
@@ -26,6 +27,8 @@ export default function AcademiePage() {
   const [group, setGroup] = useState<AcademyGroup | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [payOption, setPayOption] = useState<PaymentOption>("full");
+  // Consentement aux conditions et à la politique (obligatoire avant paiement)
+  const [accepted, setAccepted] = useState(false);
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [paySettings, setPaySettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [loading, setLoading] = useState(false);
@@ -64,6 +67,7 @@ export default function AcademiePage() {
           userEmail: form.email,
           userPhone: form.phone,
           paymentOption: payOption,
+              acceptTerms: accepted,
         }),
       });
       const data = await res.json();
@@ -213,12 +217,14 @@ export default function AcademiePage() {
               onChange={setPayOption}
             />
 
+            <TermsConsent checked={accepted} onChange={setAccepted} />
+
             {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
             <button
               type="button"
               onClick={handlePay}
-              disabled={loading}
+              disabled={loading || !accepted}
               className="mt-5 w-full rounded-md bg-primary py-3.5 font-display font-extrabold uppercase italic tracking-wider text-primary-foreground transition-opacity hover:bg-primary-bright disabled:opacity-60"
             >
               {loading

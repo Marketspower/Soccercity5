@@ -298,7 +298,9 @@ export async function sendEventRequestAcceptedEmail(p: {
        <p><strong>La date est confirmée dès réception du paiement.</strong> Tant que le paiement n'est pas fait,
        le créneau peut être réservé par quelqu'un d'autre.</p>
        ${button(p.payUrl, `Payer ${money(p.total)} en ligne`)}
-       <p style="color:#666;font-size:13px;">Paiement sécurisé par Stripe. Une question ? Répondez simplement à ce courriel.</p>`
+       <p style="color:#666;font-size:13px;">Paiement sécurisé par Stripe. En payant, vous acceptez nos
+       ${SITE_URL ? `<a href="${SITE_URL}/conditions">conditions d'utilisation</a> et notre <a href="${SITE_URL}/confidentialite">politique de confidentialité</a>` : "conditions d'utilisation et notre politique de confidentialité"}.
+       Une question ? Répondez simplement à ce courriel.</p>`
     )
   );
 }

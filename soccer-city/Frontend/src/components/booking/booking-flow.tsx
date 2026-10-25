@@ -23,6 +23,7 @@ import {
   type PaymentSettings,
 } from "@/lib/taxes";
 import { PaymentOptions } from "@/components/booking/payment-options";
+import { TermsConsent } from "@/components/booking/terms-consent";
 import type { PaymentOption } from "@/lib/types";
 
 type Mode = "single" | "multi" | "dates";
@@ -98,6 +99,8 @@ export function BookingFlow() {
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [paySettings, setPaySettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [payOption, setPayOption] = useState<PaymentOption>("full");
+  // Consentement aux conditions et à la politique (obligatoire avant paiement)
+  const [accepted, setAccepted] = useState(false);
 
   // Taux de taxes et réglages d'acompte configurés dans l'admin
   useEffect(() => {
@@ -204,6 +207,7 @@ export function BookingFlow() {
               userEmail: form.email,
               userPhone: form.phone,
               paymentOption: payOption,
+              acceptTerms: accepted,
             }
           : mode === "single"
           ? {
@@ -217,6 +221,7 @@ export function BookingFlow() {
               userEmail: form.email,
               userPhone: form.phone,
               paymentOption: payOption,
+              acceptTerms: accepted,
             }
           : {
               fieldId: selectedField.id,
@@ -230,6 +235,7 @@ export function BookingFlow() {
               userEmail: form.email,
               userPhone: form.phone,
               paymentOption: payOption,
+              acceptTerms: accepted,
             };
 
       const res = await fetch("/api/checkout", {
@@ -469,12 +475,14 @@ export function BookingFlow() {
           />
         </div>
 
+        <TermsConsent checked={accepted} onChange={setAccepted} />
+
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
         <button
           type="button"
           onClick={handlePay}
-          disabled={loading}
+          disabled={loading || !accepted}
           className="mt-6 w-full rounded-md bg-primary py-3 font-bold text-white transition-opacity disabled:opacity-60"
         >
           {loading
