@@ -1,5 +1,5 @@
 // components/events/event-booking.tsx
-// Réservation d'un événement payée EN LIGNE (prix fixe par jour) :
+// Réservation d'un événement payée EN LIGNE (prix à l'heure) :
 //   1. le client choisit UNE date ou PLUSIEURS jours (même calendrier
 //      multi-sélection que la location de terrain) + la plage horaire
 //   2. coordonnées + récapitulatif taxé + totalité/acompte
@@ -64,16 +64,16 @@ export function EventBooking({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Prix/jour modifiable depuis l'admin (Tarifs) — repli sur la config
-  const [pricePerDay, setPricePerDay] = useState(pkg.pricePerDay);
+  // Prix à l'heure modifiable depuis l'admin (Tarifs) — repli sur la config
+  const [pricePerHour, setPricePerHour] = useState(pkg.pricePerHour);
 
   useEffect(() => {
     loadTaxSettings().then(setTaxSettings).catch(() => {});
     loadPaymentSettings().then(setPaySettings).catch(() => {});
     loadEventPrices()
-      .then((p) => setPricePerDay(p[eventType] ?? pkg.pricePerDay))
+      .then((p) => setPricePerHour(p[eventType] ?? pkg.pricePerHour))
       .catch(() => {});
-  }, [eventType, pkg.pricePerDay]);
+  }, [eventType, pkg.pricePerHour]);
 
   const sorted = useMemo(() => [...dates].sort(), [dates]);
 
@@ -108,7 +108,9 @@ export function EventBooking({
     );
   }, [sorted, bookedSpans, startTime, endTime]);
 
-  const subtotal = Math.round(pricePerDay * sorted.length * 100) / 100;
+  const hoursPerDay =
+    startTime && endTime ? Math.max(0, (timeToMinutes(endTime) - timeToMinutes(startTime)) / 60) : 0;
+  const subtotal = Math.round(pricePerHour * hoursPerDay * sorted.length * 100) / 100;
   const taxes = computeTaxes(subtotal, taxSettings);
   const ready =
     sorted.length > 0 && !!startTime && !!endTime && conflictDates.length === 0;
@@ -160,7 +162,7 @@ export function EventBooking({
     return (
       <div className="space-y-4">
         <p className="rounded-lg bg-primary/10 px-4 py-2.5 text-sm">
-          <b className="text-primary">{pricePerDay} $ / jour</b>
+          <b className="text-primary">{pricePerHour} $ / heure</b>
           <span className="text-muted-foreground"> (avant taxes) — {pkg.tagline}</span>
         </p>
 
@@ -264,8 +266,9 @@ export function EventBooking({
         {sorted.length > 0 && (
           <div className="rounded-md border bg-card p-4 text-sm">
             <p>
-              <b>{sorted.length} jour{sorted.length > 1 ? "s" : ""}</b> × {pricePerDay} $
-              {startTime && endTime ? ` · ${startTime} – ${endTime} chaque jour` : ""}
+              <b>{sorted.length} jour{sorted.length > 1 ? "s" : ""}</b>
+              {hoursPerDay > 0 ? ` × ${hoursPerDay} h` : ""} × {pricePerHour} $/h
+              {startTime && endTime ? ` · ${startTime} – ${endTime} chaque jour` : " — choisissez l'horaire"}
             </p>
             <p className="mt-1 font-bold text-primary">
               Sous-total : {subtotal.toFixed(2)} $ <span className="font-normal text-muted-foreground">(+ taxes à l'étape suivante)</span>

@@ -38,7 +38,7 @@ export default function AdminPricing() {
   const [pay, setPay] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [payState, setPayState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  // ===== Prix par jour des événements réservables en ligne =====
+  // ===== Prix à l'heure des événements réservables en ligne =====
   const [eventPrices, setEventPrices] = useState<EventPrices>(DEFAULT_EVENT_PRICES);
   const [eventState, setEventState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
@@ -142,15 +142,16 @@ export default function AdminPricing() {
         ))}
       </ul>
 
-      {/* ===== Section Prix des événements (par jour) ===== */}
+      {/* ===== Section Prix des événements (à l'heure) ===== */}
       <section className="rounded-lg border bg-card p-6">
         <div className="flex items-center gap-2">
           <span className="text-xl">🎉</span>
-          <h2 className="text-xl font-bold">Prix des événements (par jour)</h2>
+          <h2 className="text-xl font-bold">Prix des événements (à l&apos;heure)</h2>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sous-total avant taxes, par jour réservé. Appliqué immédiatement sur
-          les pages Événements et au paiement. (L&apos;anniversaire a son
+          Sous-total avant taxes, par heure réservée (prix total = taux × nombre
+          d&apos;heures × nombre de jours). Appliqué immédiatement sur les pages
+          Événements et au paiement. (L&apos;anniversaire a son
           forfait, les terrains leur tarif horaire ci-dessus.)
         </p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -162,19 +163,19 @@ export default function AdminPricing() {
                   id={`evp-${pkg.key}`}
                   type="number"
                   min={0}
-                  step={25}
+                  step={5}
                   value={eventPrices[type] ?? ""}
                   onChange={(ev) =>
                     setEventPrices((prev) => ({ ...prev, [type]: Number(ev.target.value) }))
                   }
-                  className="pr-16 text-lg font-bold tabular-nums"
+                  className="pr-20 text-lg font-bold tabular-nums"
                 />
                 <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                  $ / jour
+                  $ / heure
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                {formatCAD(computeTaxes(eventPrices[type] ?? 0, taxes).total)} taxes incluses
+                {formatCAD(computeTaxes(eventPrices[type] ?? 0, taxes).total)} / heure taxes incluses
               </p>
             </div>
           ))}

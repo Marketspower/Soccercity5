@@ -1,5 +1,5 @@
 // lib/event-prices.ts
-// Prix PAR JOUR des événements réservables en ligne (Tournoi, Entreprise,
+// Prix À L'HEURE des événements réservables en ligne (Tournoi, Entreprise,
 // École, Événement privé, Compétition) — modifiables depuis l'admin
 // (page Tarifs), stockés dans la table `settings` comme les taxes,
 // avec repli sur les valeurs de config/packages. Aucun redéploiement
@@ -11,7 +11,7 @@ import { EVENT_PACKAGES } from "@/config/packages";
 export type EventPrices = Record<string, number>;
 
 export const DEFAULT_EVENT_PRICES: EventPrices = Object.fromEntries(
-  Object.entries(EVENT_PACKAGES).map(([type, pkg]) => [type, pkg.pricePerDay])
+  Object.entries(EVENT_PACKAGES).map(([type, pkg]) => [type, pkg.pricePerHour])
 );
 
 /** Clé settings : event_price_<key> (ex. event_price_tournoi). */

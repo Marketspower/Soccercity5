@@ -92,7 +92,7 @@ export default function AdminEvents() {
             <EventCard
               key={e.id}
               event={e}
-              defaultPrice={prices[e.type] ?? 0}
+              hourlyRate={prices[e.type] ?? 0}
               onRespond={respondToEvent}
             />
           ))}
@@ -104,11 +104,12 @@ export default function AdminEvents() {
 
 function EventCard({
   event: e,
-  defaultPrice,
+  hourlyRate,
   onRespond,
 }: {
   event: PrivateEvent;
-  defaultPrice: number;
+  /** Tarif horaire du type d'événement (page Tarifs) */
+  hourlyRate: number;
   onRespond: ReturnType<typeof useAppStore.getState>["respondToEvent"];
 }) {
   const [mode, setMode] = useState<"idle" | "accept" | "decline">("idle");
@@ -120,10 +121,17 @@ function EventCard({
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [payUrl, setPayUrl] = useState<string | null>(null);
 
+  // Prix proposé = tarif horaire × durée (modifiable à la main)
+  const [priceTouched, setPriceTouched] = useState(e.quotedPrice != null);
+  const hours =
+    startTime && endTime
+      ? Math.max(0, (Number(endTime.slice(0, 2)) * 60 + Number(endTime.slice(3, 5)) - (Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3, 5)))) / 60)
+      : 0;
   useEffect(() => {
-    if (!price) setPrice(String(e.quotedPrice ?? defaultPrice ?? ""));
+    if (e.quotedPrice != null && !price) setPrice(String(e.quotedPrice));
+    else if (!priceTouched && hours > 0 && hourlyRate > 0) setPrice(String(Math.round(hourlyRate * hours * 100) / 100));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultPrice, e.quotedPrice]);
+  }, [hourlyRate, hours, e.quotedPrice]);
 
   const run = async (fn: () => Promise<{ payUrl?: string; emailSent?: boolean }>, okText: string) => {
     setBusy(true);
@@ -177,7 +185,12 @@ function EventCard({
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <Label>Prix avant taxes ($)</Label>
-              <Input type="number" min={1} step="0.01" value={price} onChange={(ev) => setPrice(ev.target.value)} />
+              <Input type="number" min={1} step="0.01" value={price} onChange={(ev) => { setPrice(ev.target.value); setPriceTouched(true); }} />
+              {hourlyRate > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tarif : {hourlyRate} $/h{hours > 0 ? ` × ${hours} h = ${(hourlyRate * hours).toFixed(2)} $` : ""}
+                </p>
+              )}
             </div>
             <div>
               <Label>Début</Label>

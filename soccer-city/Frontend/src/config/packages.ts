@@ -68,22 +68,23 @@ export function academyGroup(key: string): AcademyGroup | undefined {
   return ACADEMIE.groups.find((g) => g.key === key);
 }
 
-/** ===== Événements réservables en ligne (prix fixe PAR JOUR) ===== */
+/** ===== Événements réservables en ligne (prix À L'HEURE) ===== */
 /** ⚠️ PRIX À AJUSTER par le client — valeurs de départ indicatives. */
 export interface EventPackage {
   key: string;
   label: string;
-  /** Sous-total avant taxes, par jour réservé. */
-  pricePerDay: number;
+  /** Sous-total avant taxes, PAR HEURE réservée (valeur de secours :
+   *  le prix réel se règle dans l'admin, page Tarifs). */
+  pricePerHour: number;
   tagline: string;
 }
 
 export const EVENT_PACKAGES: Record<string, EventPackage> = {
-  "Tournoi":          { key: "tournoi",     label: "Tournoi",          pricePerDay: 1200, tagline: "Les deux terrains, arbitrage et tableau des scores" },
-  "Entreprise":       { key: "entreprise",  label: "Entreprise",       pricePerDay: 1500, tagline: "Team building clé en main, espace café privatisé" },
-  "École":            { key: "ecole",       label: "École",            pricePerDay: 900,  tagline: "Journée sportive encadrée pour vos élèves" },
-  "Événement privé":  { key: "prive",       label: "Événement privé",  pricePerDay: 1300, tagline: "Le complexe rien que pour votre groupe" },
-  "Compétition":      { key: "competition", label: "Compétition",      pricePerDay: 1200, tagline: "Structure officielle, classement et récompenses" },
+  "Tournoi":          { key: "tournoi",     label: "Tournoi",          pricePerHour: 130,  tagline: "Les deux terrains, arbitrage et tableau des scores" },
+  "Entreprise":       { key: "entreprise",  label: "Entreprise",       pricePerHour: 150,  tagline: "Team building clé en main, espace café privatisé" },
+  "École":            { key: "ecole",       label: "École",            pricePerHour: 90,   tagline: "Journée sportive encadrée pour vos élèves" },
+  "Événement privé":  { key: "prive",       label: "Événement privé",  pricePerHour: 150,  tagline: "Le complexe rien que pour votre groupe" },
+  "Compétition":      { key: "competition", label: "Compétition",      pricePerHour: 130,  tagline: "Structure officielle, classement et récompenses" },
 };
 
 export function eventPackage(type: string): EventPackage | null {

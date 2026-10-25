@@ -4,7 +4,7 @@
 //    continue (endDate), ou dates au choix ("terrain-dates")
 //  - un forfait anniversaire ("anniversaire") — durée fixe imposée par le serveur
 //  - une inscription à l'académie ("academie")
-//  - un événement réservé en ligne ("evenement") — prix fixe par jour
+//  - un événement réservé en ligne ("evenement") — prix à l'heure
 //
 // Sécurité : prix, durée et disponibilités sont TOUJOURS recalculés ici.
 // Rien de ce qu'envoie le navigateur n'est cru sur parole.
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
       metaExtra.groupLabel = group.label;
       metaExtra.schedule = group.schedule;
     } else if (kind === "evenement") {
-      // ===== Événement en ligne : prix fixe PAR JOUR, complexe privatisé =====
+      // ===== Événement en ligne : prix À L'HEURE × heures × jours, complexe privatisé =====
       const eventType = String(body.eventType || "");
       const pkg = eventPackage(eventType);
       const dates = uniqueDates(body.dates);
@@ -140,13 +140,14 @@ export async function POST(req: NextRequest) {
         return bad(`Ces dates viennent d'être réservées : ${conflicts.join(", ")}. Retirez-les ou changez d'horaire.`, 409);
       }
       const eventPrices = await loadEventPrices();
-      const perDay = eventPrices[eventType] ?? pkg.pricePerDay;
-      subtotal = round2(perDay * dates.length);
+      const perHour = eventPrices[eventType] ?? pkg.pricePerHour;
+      const hoursPerDay = (toMinutes(endTime) - toMinutes(startTime)) / 60;
+      subtotal = round2(perHour * hoursPerDay * dates.length);
       reservationType = eventType;
       fieldName = eventType;
       date = dates[0];
       endDate = dates[0];
-      label = `${eventType} — ${dates.length} jour(s) de ${startTime} à ${endTime}`;
+      label = `${eventType} — ${dates.length} jour(s) de ${startTime} à ${endTime} (${hoursPerDay} h × ${perHour} $/h)`;
       metaExtra.dates = JSON.stringify(dates);
       metaExtra.guests = guests ? String(guests) : "";
     } else if (kind === "terrain-dates" || kind === "terrain") {
