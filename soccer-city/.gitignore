@@ -1,2 +1,16 @@
-node_modules/ 
-.next/ 
+# Dépendances et builds
+node_modules/
+.next/
+out/
+dist/
+
+# Variables d'environnement : NE JAMAIS les publier
+.env
+.env.*
+!.env.example
+
+# Divers
+.DS_Store
+*.log
+.vercel
+*.tsbuildinfo
