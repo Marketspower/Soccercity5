@@ -114,6 +114,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link href="/admin/tarifs" className="text-white/70 hover:bg-white/10 rounded-md px-3 py-2 text-sm transition-colors">
                 💰 Tarifs
               </Link>
+              <Link href="/admin/apparence" className="text-white/70 hover:bg-white/10 rounded-md px-3 py-2 text-sm transition-colors">
+                🎨 Apparence
+              </Link>
               <Link href="/admin/avis" className="text-white/70 hover:bg-white/10 rounded-md px-3 py-2 text-sm transition-colors">
                 ⭐ Avis clients
               </Link>

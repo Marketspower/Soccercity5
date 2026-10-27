@@ -152,6 +152,7 @@ const mapMediaFromDb = (row: any): MediaItem => ({
   isFeatured: row.is_featured ?? false,
   eventId: row.event_id ?? null,
   eventType: row.event_type ?? null,
+  sortOrder: row.sort_order ?? 0,
   event: mapJoinedEvent(row.event),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -562,7 +563,8 @@ export const useAppStore = create<AppState>()(
           const { data, error } = await supabase
             .from('gallery')
             .select('*')
-            .order('sort_order', { ascending: true });
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: false });
 
           if (error) throw error;
           set({ gallery: (data || []).map(mapGalleryFromDb) });
@@ -574,10 +576,16 @@ export const useAppStore = create<AppState>()(
 
       syncMedia: async () => {
         try {
-          const { data, error } = await supabase
+          // Ordre choisi dans l'admin, puis du plus récent au plus ancien
+          let { data, error } = await supabase
             .from('media')
             .select('*')
+            .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false });
+          if (error && /sort_order/.test(error.message || '')) {
+            // Colonne pas encore créée (migration 20261027 non exécutée)
+            ({ data, error } = await supabase.from('media').select('*').order('created_at', { ascending: false }));
+          }
 
           if (error) throw error;
           set({ media: (data || []).map(mapMediaFromDb) });

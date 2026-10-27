@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { EventTypeBands } from "@/components/media/event-type-bands";
 import {
   computeTaxes,
   computeDeposit,
@@ -92,6 +93,8 @@ export default function AcademiePage() {
           {ACADEMIE.price} $ / {ACADEMIE.period} + taxes · {ACADEMIE.sessionsPerWeek}{" "}
           entraînements par semaine. {ACADEMIE.objectifs}
         </p>
+
+        <EventTypeBands eventType="Académie" className="mt-6" />
 
         {/* ===== Déroulement d'une séance ===== */}
         <div className="mt-5 rounded-xl border bg-card/60 p-4">

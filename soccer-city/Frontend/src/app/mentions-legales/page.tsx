@@ -1,29 +1,62 @@
 import type { Metadata } from "next";
-import { CONTACT } from "@/lib/data";
+import Link from "next/link";
+import { LegalPage } from "@/components/legal/legal-page";
+import { LEGAL, legalEntity } from "@/lib/legal";
 
-export const metadata: Metadata = { 
-  title: "Mentions légales" 
+export const metadata: Metadata = {
+  title: "Mentions légales",
 };
 
 export default function MentionsLegales() {
   return (
-    <div className="container max-w-3xl pt-32 pb-24">
-      <p className="speed-eyebrow mb-4">Informations légales</p>
-      <h1 className="text-4xl font-bold mb-10">Mentions légales</h1>
-      <div className="space-y-8 text-sm leading-relaxed text-muted-foreground">
-        <section>
-          <h2 className="text-lg font-bold text-foreground mb-2">Éditeur du site</h2>
-          <p>Soccer City inc. — {CONTACT.address}<br />Téléphone : {CONTACT.phone} · Courriel : {CONTACT.email}</p>
-        </section>
-        <section>
-          <h2 className="text-lg font-bold text-foreground mb-2">Hébergement</h2>
-          <p>Ce site est hébergé par un fournisseur d&apos;infonuagique.</p>
-        </section>
-        <section>
-          <h2 className="text-lg font-bold text-foreground mb-2">Propriété intellectuelle</h2>
-          <p>L&apos;ensemble des contenus (logo, textes, visuels, structure) est la propriété exclusive de Soccer City inc.</p>
-        </section>
-      </div>
-    </div>
+    <LegalPage
+      eyebrow="Informations légales"
+      title="Mentions légales"
+      sections={[
+        {
+          id: "editeur",
+          title: "Éditeur du site",
+          body: (
+            <p>
+              {legalEntity()}
+              <br />{LEGAL.address}
+              <br />Téléphone : {LEGAL.phone} · Courriel :{" "}
+              <a href={`mailto:${LEGAL.email}`} className="text-primary hover:underline">{LEGAL.email}</a>
+            </p>
+          ),
+        },
+        {
+          id: "hebergement",
+          title: "Hébergement",
+          body: (
+            <p>
+              Site hébergé par Vercel Inc. (vercel.com). Base de données et fichiers hébergés par Supabase
+              (supabase.com). Paiements traités par Stripe (stripe.com).
+            </p>
+          ),
+        },
+        {
+          id: "propriete",
+          title: "Propriété intellectuelle",
+          body: (
+            <p>
+              L&apos;ensemble des contenus du site (logo, textes, photos, vidéos, structure) appartient à {LEGAL.brand}{" "}
+              ou à ses partenaires et ne peut être reproduit sans autorisation écrite.
+            </p>
+          ),
+        },
+        {
+          id: "liens",
+          title: "Documents associés",
+          body: (
+            <p>
+              <Link href="/conditions" className="text-primary hover:underline">Conditions d&apos;utilisation</Link>
+              {" · "}
+              <Link href="/confidentialite" className="text-primary hover:underline">Politique de confidentialité</Link>
+            </p>
+          ),
+        },
+      ]}
+    />
   );
 }

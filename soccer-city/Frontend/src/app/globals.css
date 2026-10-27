@@ -443,3 +443,61 @@
 .cms-content a { color: hsl(var(--primary)); text-decoration: underline; }
 .cms-content nav { margin: 1.5rem 0; padding: 1rem 1.25rem; border: 1px solid hsl(var(--border)); border-radius: 0.5rem; background: hsl(var(--card)); }
 .cms-content nav ol { margin: 0.25rem 0 0; }
+
+/* =====================================================================
+   FOND DU SITE (Admin → Apparence) — styles A, B et D
+   Le calque est en position fixe (et non background-attachment: fixed,
+   ignoré par Safari iOS). Image allégée sous 768 px.
+   ===================================================================== */
+html[data-bg] { background-color: hsl(var(--background)); }
+html[data-bg="fixed"] body,
+html[data-bg="windows"] body { background-color: transparent; }
+
+.site-bg-layer {
+  position: fixed; inset: 0; z-index: -1;
+  background-image: var(--bg-desktop);
+  background-size: cover; background-position: center;
+}
+.site-bg-overlay { position: absolute; inset: 0; background: rgb(5 6 7 / var(--bg-overlay, 0.7)); }
+@media (max-width: 768px) { .site-bg-layer { background-image: var(--bg-mobile); } }
+
+/* ----- A : tout le site défile au-dessus de l'image ----- */
+html[data-bg="fixed"] .bg-card { background-color: hsl(var(--card) / 0.72); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+html[data-bg="fixed"] .bg-background { background-color: hsl(var(--background) / 0.55); }
+html[data-bg="fixed"] footer { background-color: hsl(var(--background) / 0.85); }
+
+/* ----- B : sections opaques, « fenêtres » transparentes entre elles ----- */
+html[data-bg="windows"] .site-bg-overlay { background: rgb(5 6 7 / calc(var(--bg-overlay, 0.7) * 0.6)); }
+html[data-bg="windows"] main > section[id] {
+  position: relative;
+  margin-top: 38vh;
+  background-color: hsl(var(--background));
+  /* fond pleine largeur même pour les sections « container » */
+  box-shadow: 0 0 0 100vmax hsl(var(--background));
+  clip-path: inset(0 -100vmax);
+}
+html[data-bg="windows"] main > section[id]:first-of-type { margin-top: 20vh; }
+html[data-bg="windows"] footer { position: relative; margin-top: 30vh; background-color: hsl(var(--background)); }
+@media (max-width: 768px) { html[data-bg="windows"] main > section[id] { margin-top: 26vh; } }
+
+/* ----- D : une image fixe par section, révélée au défilement ----- */
+html[data-bg="sections"] main > section[id] {
+  position: relative;
+  isolation: isolate;
+  clip-path: inset(0 -100vmax); /* pleine largeur ; le calque fixe est découpé à la section */
+}
+.site-bg-section-layer {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image: var(--section-bg-desktop);
+  background-size: cover; background-position: center;
+}
+.site-bg-section-layer::after { content: ""; position: absolute; inset: 0; background: rgb(5 6 7 / var(--bg-overlay, 0.7)); }
+@media (max-width: 768px) { .site-bg-section-layer { background-image: var(--section-bg-mobile); } }
+html[data-bg="sections"] .bg-card { background-color: hsl(var(--card) / 0.8); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* ----- Mouvement réduit : image statique, pas d'effet de défilement ----- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .site-bg-layer { position: absolute; height: 100vh; }
+  .site-bg-section-layer { position: absolute; }
+}

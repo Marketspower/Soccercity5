@@ -1,7 +1,7 @@
 // components/events/event-detail.tsx
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { 
   ArrowLeft, 
@@ -9,18 +9,14 @@ import {
   Phone, 
   Mail, 
   MapPin, 
-  Clock,
-  ChevronLeft,
-  ChevronRight,
-  Play,
-  Pause
+  Clock
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { EventForm } from "@/components/events/event-form";
 import { EventBooking } from "@/components/events/event-booking";
 import { eventPackage } from "@/config/packages";
 import type { EventType, GalleryImage, MediaItem } from "@/lib/types";
-import { VideoPlayer } from "@/components/media/video-player";
+import { MediaBands } from "@/components/media/media-bands";
 
 const EVENT_ICONS: Record<EventType, string> = {
   "Anniversaire": "🎂",
@@ -97,10 +93,6 @@ interface EventDetailProps {
 
 export function EventDetail({ eventType }: EventDetailProps) {
   const { gallery, media, loadGallery, loadMedia } = useAppStore();
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
   // Charger les données
   useEffect(() => {
@@ -120,47 +112,6 @@ export function EventDetail({ eventType }: EventDetailProps) {
 
   const typedVideos = media.filter((v) => v.type === "video" && v.eventType === eventType);
   const eventVideos: MediaItem[] = typedVideos;
-
-  // Revenir à la 1re image si la liste change (chargement, changement de type)
-  useEffect(() => {
-    setCurrentImageIndex(0);
-  }, [eventImages.length]);
-
-  // Carrousel automatique
-  useEffect(() => {
-    if (isAutoPlaying && eventImages.length > 1) {
-      autoPlayRef.current = setInterval(() => {
-        nextImage();
-      }, 5000);
-    }
-    return () => {
-      if (autoPlayRef.current) {
-        clearInterval(autoPlayRef.current);
-      }
-    };
-  }, [isAutoPlaying, eventImages.length]);
-
-  const nextImage = () => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrentImageIndex((prev) => (prev + 1) % eventImages.length);
-    setTimeout(() => setIsTransitioning(false), 500);
-  };
-
-  const prevImage = () => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrentImageIndex((prev) => (prev - 1 + eventImages.length) % eventImages.length);
-    setTimeout(() => setIsTransitioning(false), 500);
-  };
-
-  const toggleAutoPlay = () => {
-    setIsAutoPlaying(!isAutoPlaying);
-    if (autoPlayRef.current) {
-      clearInterval(autoPlayRef.current);
-      autoPlayRef.current = null;
-    }
-  };
 
   const [showCustomForm, setShowCustomForm] = useState(false);
   const pkg = eventPackage(eventType);
@@ -182,7 +133,7 @@ export function EventDetail({ eventType }: EventDetailProps) {
 
         <div className="grid gap-12 lg:grid-cols-2">
           {/* Colonne gauche - Images et médias */}
-          <div>
+          <div className="min-w-0">
             {/* En-tête de l'événement */}
             <div className="mb-6">
               <span className="text-4xl block mb-2">{icon}</span>
@@ -190,85 +141,32 @@ export function EventDetail({ eventType }: EventDetailProps) {
               <p className="text-muted-foreground mt-2">{description}</p>
             </div>
 
-            {/* Carrousel d'images */}
-            {eventImages.length > 0 && (
-              <div className="relative rounded-xl overflow-hidden bg-muted aspect-[4/3]">
-                <div 
-                  className="flex transition-transform duration-500 ease-out h-full"
-                  style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
-                >
-                  {eventImages.map((img, index) => (
-                    <div key={img.id} className="min-w-full h-full relative">
-                      <img
-                        src={img.imageUrl}
-                        alt={img.alt || `${eventType} - Image ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Contrôles du carrousel */}
-                {eventImages.length > 1 && (
-                  <>
-                    <button
-                      onClick={prevImage}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all hover:scale-110"
-                      aria-label="Image précédente"
-                    >
-                      <ChevronLeft className="size-6" />
-                    </button>
-                    <button
-                      onClick={nextImage}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all hover:scale-110"
-                      aria-label="Image suivante"
-                    >
-                      <ChevronRight className="size-6" />
-                    </button>
-
-                    <button
-                      onClick={toggleAutoPlay}
-                      className="absolute bottom-4 right-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all"
-                      aria-label={isAutoPlaying ? "Pause" : "Lecture automatique"}
-                    >
-                      {isAutoPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
-                    </button>
-
-                    {/* Indicateurs */}
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                      {eventImages.map((_, index) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            setCurrentImageIndex(index);
-                          }}
-                          className={`w-2 h-2 rounded-full transition-all ${
-                            index === currentImageIndex 
-                              ? 'bg-white w-6' 
-                              : 'bg-white/50 hover:bg-white/80'
-                          }`}
-                          aria-label={`Aller à l'image ${index + 1}`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Vidéos (YouTube, Vimeo ou fichier) */}
-            {eventVideos.length > 0 && (
-              <div className="mt-6">
-                <h2 className="text-lg font-semibold mb-4">En vidéo</h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {eventVideos.slice(0, 4).map((video) => (
-                    <figure key={video.id} className="space-y-2">
-                      <VideoPlayer url={video.url} title={video.title} poster={video.thumbnail} />
-                      <figcaption className="text-sm text-muted-foreground">{video.title}</figcaption>
-                    </figure>
-                  ))}
-                </div>
-              </div>
+            {/* Photos et vidéos en bandes défilantes (plein écran au clic) */}
+            {(eventImages.length > 0 || eventVideos.length > 0) && (
+              <MediaBands
+                size="sm"
+                className="-mx-4 sm:mx-0"
+                rows={[
+                  {
+                    items: eventImages.map((img, i) => ({
+                      id: `p-${img.id}`,
+                      kind: "photo" as const,
+                      src: img.imageUrl,
+                      alt: img.alt || `${eventType} chez Soccer City — photo ${i + 1}`,
+                    })),
+                  },
+                  {
+                    reverse: true,
+                    items: eventVideos.map((v) => ({
+                      id: `v-${v.id}`,
+                      kind: "video" as const,
+                      src: v.url,
+                      alt: v.title,
+                      poster: v.thumbnail,
+                    })),
+                  },
+                ]}
+              />
             )}
           </div>
 

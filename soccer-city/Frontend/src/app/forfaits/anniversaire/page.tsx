@@ -7,6 +7,7 @@ import { montrealNow } from "@/lib/time-utils";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { EventTypeBands } from "@/components/media/event-type-bands";
 import { fetchBookedSpans, type BookedSpan } from "@/lib/api";
 import {
   computeTaxes,
@@ -155,6 +156,8 @@ export default function AnniversairePage() {
           {ANNIVERSAIRE.price} $ + taxes · 2 h 30 : 1 h 30 d&apos;animation, gâteau
           et fête, puis 1 h de match de soccer.
         </p>
+
+        <EventTypeBands eventType="Anniversaire" className="mt-6" />
 
         {/* ===== Étape 1 : le jour ===== */}
         <h2 className="mt-8 mb-3 text-lg font-bold">1. Choisissez votre jour</h2>

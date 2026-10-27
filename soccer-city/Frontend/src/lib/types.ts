@@ -46,6 +46,8 @@ export interface MediaItem {
   eventId: string | null;
   /** Type d'événement auquel le média est rattaché (null = général). */
   eventType: MediaEventType | null;
+  /** Ordre d'affichage (glisser-déposer dans l'admin). */
+  sortOrder: number;
   event?: {
     id: string;
     firstName: string;

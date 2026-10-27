@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import { Providers } from "@/components/layout/providers";
 import { LayoutContent } from "@/components/layout/layout-content";
 import { Analytics } from "@/components/layout/analytics";
+import { SiteBackground } from "@/components/layout/site-background";
+import { Suspense } from "react";
 import { CONTACT } from "@/lib/data";
 import "./globals.css";
 
@@ -70,6 +72,9 @@ export default function RootLayout({
         />
         <Analytics />
         <Providers>
+          <Suspense fallback={null}>
+            <SiteBackground />
+          </Suspense>
           <LayoutContent>{children}</LayoutContent>
         </Providers>
       </body>

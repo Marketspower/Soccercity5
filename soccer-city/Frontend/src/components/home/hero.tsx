@@ -4,7 +4,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRef, useEffect, useState } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { CalendarCheck, ChevronDown, Clock, MapPin, PartyPopper, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Counter } from "@/components/motion/counter";
@@ -24,7 +24,9 @@ export function Hero() {
     target: ref,
     offset: ["start start", "end start"],
   });
-  const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "24%"]);
+  const reduceMotion = useReducedMotion();
+  const bgYMotion = useTransform(scrollYProgress, [0, 1], ["0%", "24%"]);
+  const bgY = reduceMotion ? "0%" : bgYMotion;
   const fade = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
   const { fields } = useAppStore();
@@ -283,9 +285,22 @@ export function Hero() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pitch opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-pitch" />
           </span>
-          Disponibilités en temps réel · {new Date().toLocaleTimeString("fr-CA")}
+          Disponibilités en temps réel<LiveClock />
         </div>
       </section>
     </>
   );
+}
+
+/** Heure de Montréal, affichée seulement dans le navigateur (évite l'écart serveur/navigateur). */
+function LiveClock() {
+  const [time, setTime] = useState("");
+  useEffect(() => {
+    const fmt = () =>
+      new Date().toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
+    setTime(fmt());
+    const id = setInterval(() => setTime(fmt()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return time ? <> · {time}</> : null;
 }

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { AdminGallery } from "@/components/admin/AdminGallery";
 import { AdminMedia } from "@/components/admin/AdminMedia";
+import { BandSpeedSetting } from "@/components/admin/band-speed-setting";
 import { MEDIA_EVENT_TYPES, type MediaEventType } from "@/lib/types";
 
 export default function AdminEventTypeMediaPage() {
@@ -43,6 +44,7 @@ export default function AdminEventTypeMediaPage() {
         </p>
       ) : (
         <>
+          <BandSpeedSetting />
           <AdminGallery fixedEventType={decodedType} />
           <AdminMedia fixedEventType={decodedType} />
         </>
